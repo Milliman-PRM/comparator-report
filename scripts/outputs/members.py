@@ -30,9 +30,9 @@ def main() -> int:
             path.stem: sparkapp.load_df(path)
             for path in [
                     PATH_INPUTS / 'members.parquet',
-                    PATH_INPUTS / 'members_rolling.parquet',
-                    PATH_INPUTS / 'member_months.parquet',
-                    PATH_INPUTS / 'time_periods.parquet'
+                    PATH_INPUTS / 'member_time_windows.parquet',
+                    PATH_INPUTS / 'time_periods.parquet',
+                    PATH_RS / 'risk_scores.parquet'
                     ]
             }
     
@@ -46,74 +46,51 @@ def main() -> int:
     quarter_start, quarter_end = [str((dt.month - 1) // 3 + 1) for dt in [min_incurred_date, max_incurred_date]]
     time_span = ''.join([str(min_incurred_date.year), 'Q', quarter_start, '_', str(max_incurred_date.year), 'Q', quarter_end])
     
-    max_member_months = dfs_input['member_months'].filter(
-            spark_funcs.col('month').between(
+    member_months = dfs_input['member_time_windows'].filter(
+            spark_funcs.col('elig_month').between(
                     min_incurred_date,
                     max_incurred_date,)
-            ).select(
-                    'member_id', 
-                    'month',
-            ).groupBy(
-                    'member_id',
-            ).agg(
-                    spark_funcs.max('month').alias('max_elig'),
             )
-            
-    elig_status = dfs_input['member_months'].join(
-                max_member_months,
-                on=(dfs_input['member_months'].member_id == max_member_months.member_id) 
-                & (dfs_input['member_months'].month == max_member_months.max_elig),
-                how='inner',
-        ).select(
-               dfs_input['member_months'].member_id, 
-               spark_funcs.col('elig_status_1_timeline'),
-        )
     
-    members = dfs_input['members'].join(
-            elig_status,
-            on='member_id',
-            how='leftouter',
-        ).join(
-            dfs_input['members_rolling'].filter(spark_funcs.col('month_rolling') == max_incurred_date),
-            on = 'member_id',
-            how = 'leftouter',
-        ).filter(
-            'assignment_indicator_current = "Y"'
-        ).select(
-            dfs_input['members'].member_id,       
-            spark_funcs.lit(META_SHARED['name_client']).alias('name_client'),
-            spark_funcs.lit(time_span).alias('time_period'),
-            spark_funcs.col('elig_status_1_timeline').alias('elig_status'),
-            spark_funcs.when(
-                    spark_funcs.col('death_date').isNull(),
-                    spark_funcs.lit('N'),
-                    ).otherwise(
-                            spark_funcs.lit('Y')
-            ).alias('deceased_yn'),
-            spark_funcs.col('endoflife_died_in_hospital').alias('deceased_hospital_yn'),
-            spark_funcs.col('age_current').alias('age'),
-            ##ChemoFlagNumer
-            spark_funcs.when(
-                    spark_funcs.col('death_date').isNull(),
-                    spark_funcs.lit('N'),
-                    ).otherwise(
-                            spark_funcs.lit('Y')
-            ).alias('eol_denom_yn_chemo14'),
-            spark_funcs.col('endoflife_numer_yn_hospicelt3day').alias('eol_numer_yn_hospice3'),
-            spark_funcs.col('endoflife_denom_yn_hospicelt3day').alias('eol_denom_yn_hospice3'),
-            spark_funcs.col('endoflife_numer_yn_hospicenever').alias('eol_numer_yn_hospicenever'),
-            spark_funcs.col('endoflife_denom_yn_hospicenever').alias('eol_denom_yn_hospicenever'),
-            spark_funcs.col('hospice_days').alias('final_hospice_days'),
-            spark_funcs.col('endoflife_costs_last_30_days').alias('eol_costs_30_days'),
-            spark_funcs.lit('CMS HCC Risk Score').alias('risk_score_type'),
-            spark_funcs.col('risk_score_rolling').alias('riskscr'),
-            spark_funcs.col('memmos_rolling').alias('memmos'),
-            spark_funcs.lit('').alias('riskscr_cred'),
-            spark_funcs.lit(1).alias('mem_count'),                       
-        ).filter(
-            'memmos != 0'
-        )
-
+    current_assigned = dfs_input['members'].filter('assignment_indicator = "Y"')
+    
+    risk_scores = dfs_input['risk_scores'].join(
+            dfs_input['time_periods'].filter('months_of_claims_runout = 3'),
+            on='time_period_id',
+            how='inner')
+    
+    member_months_sum = member_months.select(
+            'member_id',
+            'elig_month',
+            'memmos',
+            ).groupBy(
+                'member_id'
+            ).agg(
+                spark_funcs.max('elig_month').alias('max_elig_month'),
+                spark_funcs.sum('memmos').alias('mms'),
+            )
+    
+    members = current_assigned.join(
+                risk_scores,
+                on='member_id',
+                how='left_outer'
+            ).join(
+                member_months_sum,
+                on='member_id',
+                how='left_outer'
+            ).join(
+                member_months,
+                on=(current_assigned.member_id == member_months.member_id)
+                    & (member_months_sum.max_elig_month == member_months.elig_month),
+                how='left_outer'
+            ).select(
+                    spark_funcs.lit(time_span).alias('time_period'),
+                    current_assigned.member_id.alias('member_id'),
+                    member_months.elig_status_1.alias('elig_status'),
+                    risk_scores.risk_score.alias('risk_score'),
+                    member_months_sum.mms.alias('mms'),
+            )
+    
     sparkapp.save_df(
             members,
             PATH_OUTPUTS / 'members.parquet',
