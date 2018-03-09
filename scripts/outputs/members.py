@@ -50,7 +50,10 @@ def main() -> int:
             spark_funcs.col('elig_month').between(
                     min_incurred_date,
                     max_incurred_date,)
+            ).filter(
+                'assignment_indicator = "Y"'
             )
+    
     
     current_assigned = dfs_input['members'].filter('assignment_indicator = "Y"')
     
@@ -62,12 +65,12 @@ def main() -> int:
     member_months_sum = member_months.select(
             'member_id',
             'elig_month',
-            'memmos',
+            'memmos_medical',
             ).groupBy(
                 'member_id'
             ).agg(
                 spark_funcs.max('elig_month').alias('max_elig_month'),
-                spark_funcs.sum('memmos').alias('mms'),
+                spark_funcs.sum('memmos_medical').alias('mms'),
             )
     
     members = current_assigned.join(
