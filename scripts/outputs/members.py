@@ -9,6 +9,7 @@ import logging
 
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
+from pyspark.sql import Window
 import comparator_report.meta.project
 
 LOGGER = logging.getLogger(__name__)
@@ -50,50 +51,57 @@ def main() -> int:
                     max_incurred_date,)
             ).filter(
                 'assignment_indicator = "Y"'
+            ).groupBy(
+                'member_id',
+                'elig_month',
+            ).agg(
+                spark_funcs.sum('memmos_medical').alias('memmos')
             )
         
+    recent_info_window = Window().partitionBy(
+        'member_id',
+        'elig_month',
+    ).orderBy(
+        spark_funcs.desc('date_end'),
+    )
+
+    recent_info = dfs_input['member_time_windows'].filter(
+            spark_funcs.col('elig_month').between(
+                    min_incurred_date,
+                    max_incurred_date,)
+            ).filter(
+                'assignment_indicator = "Y"'
+            ).select(
+                '*',
+                spark_funcs.row_number().over(recent_info_window).alias('order'),
+            ).filter(
+               'order = 1'
+            )
+            
     risk_scores = dfs_input['risk_scores'].join(
             dfs_input['time_periods'].where(spark_funcs.col('months_of_claims_runout') == runout),
             on='time_period_id',
             how='inner')
     
-    member_months_sum = member_months.select(
-            'member_id',
-            'elig_month',
-            'memmos_medical',
-            ).groupBy(
-                'member_id'
-            ).agg(
-                spark_funcs.max('elig_month').alias('max_elig_month'),
-                spark_funcs.sum('memmos_medical').alias('mms'),
-            ).withColumnRenamed(
-                    'max_elig_month',
-                    'elig_month',
-            )
-       
-    members = member_months_sum.join(
-                risk_scores,
-                on='member_id',
-                how='left_outer'
-            ).join(
-                member_months,
-                on=['member_id', 'elig_month'],
-                how='left_outer'
-            ).select(
+    member_join = member_months.join(
+                    recent_info,
+                    on=['member_id', 'elig_month'],
+                    how='inner'
+                  ).join(
+                    risk_scores,
+                    on='member_id',
+                    how='left_outer'
+                  ).select(
                     'member_id',
+                    'elig_month',
                     spark_funcs.col('elig_status_1').alias('elig_status'),
+                    member_months.memmos,
                     'risk_score',
-                    'mms',
-            )
+                  )
        
     sparkapp.save_df(
-            member_months,
-            PATH_OUTPUTS / 'member_months_cr.parquet',
-            )
-    
-    sparkapp.save_df(
-            members,
-            PATH_OUTPUTS / 'members_cr.parquet',
+            member_join,
+            PATH_OUTPUTS / 'member_months.parquet',
             )
 
     return 0
