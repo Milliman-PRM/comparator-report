@@ -141,6 +141,17 @@ def main() -> int:
                 spark_funcs.sum('prm_admits').alias('metric_value')
             )
     
+    distinct_snfs = outclaims_mem.select(
+                'elig_status',
+                spark_funcs.lit('distinct_SNFs').alias('metric_id'),
+                'providerid',
+            ).groupBy(
+                'elig_status',
+                'metric_id',
+            ).agg(
+                spark_funcs.countDistinct('providerid'),
+            )
+    
     snf_metrics = admits.select(
                     'elig_status',
                     'metric_id',
@@ -155,6 +166,8 @@ def main() -> int:
                     over_21
                 ).union(
                     readmits
+                ).union(
+                    distinct_snfs
                 )
                 
     
