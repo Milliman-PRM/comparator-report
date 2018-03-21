@@ -9,7 +9,6 @@ import logging
 
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
-from pyspark.sql import Window
 from prm.dates.utils import date_as_month
 from prm.spark.io_sas import read_sas_data
 
@@ -125,8 +124,7 @@ def calc_one_day(
         ) -> "DataFrame":
     
     outclaims_od = outclaims.where(
-            (spark_funcs.col('prm_line').like('I%')) &
-            (spark_funcs.col('prm_line') != 'I31')
+            spark_funcs.col('prm_line') != 'I31'
             )
     
     one_day_denom = outclaims_od.select(
@@ -210,8 +208,10 @@ def calc_risk_adj(
         ) -> "DataFrame":
         
     outclaims_ra = outclaims.where(
-            (spark_funcs.col('prm_line').like('I%')) &
-            (spark_funcs.col('prm_line') != 'I31')
+            spark_funcs.col('prm_line') != 'I31'
+            ).withColumn(
+                'mcrm_line',
+                spark_funcs.col('prm_line').substr(1, 3)
             )
 
     risk_score = member_months.select(
@@ -221,59 +221,163 @@ def calc_risk_adj(
             ).groupBy(
                 'elig_status',
             ).agg(
-                (spark_funcs.sum(spark_funcs.col('memmos')*spark_funcs.col('risk_score')) / spark_funcs.sum(spark_funcs.col('memmos'))).alias('risk_score_avg')
+                spark_funcs.format_number((spark_funcs.sum(spark_funcs.col('memmos')*spark_funcs.col('risk_score')) / spark_funcs.sum(spark_funcs.col('memmos'))), 2).alias('risk_score_avg')
             )
    
-    acute = outclaims_ra.select(
+    outclaims_admits = outclaims_ra.select(
             'elig_status',
-            spark_funcs.lit('acute').alias('metric_id'),
+            'prm_line',
+            'mcrm_line',
             'prm_admits',
             ).groupBy(
                 'elig_status',
-                'metric_id',
-            ).agg(
-                spark_funcs.sum('prm_admits').alias('admits'),
-            )
-    
-    med_surg = outclaims_ra.where(
-            (spark_funcs.col('prm_line').like('I11%')) |
-            (spark_funcs.col('prm_line').like('I12%'))
-            ).select(
-            'elig_status',
-            spark_funcs.when(
-                    spark_funcs.col('prm_line').like('I11%'),
-                    'medical',
-                    ).otherwise(
-                        'surgical',
-                    ).alias('metric_id'),
-            'prm_admits',
-            ).groupBy(
-                'elig_status',
-                'metric_id',
+                'prm_line',
+                'mcrm_line',
             ).agg(
                 spark_funcs.sum('prm_admits').alias('admits')
+            ).join(
+                risk_score,
+                on='elig_status',
+                how='left_outer',
             )
-            
-    med_gen = outclaims_ra.where(
+    
+    outclaims_util = outclaims_admits.join(
+                hcc_risk_adj,
+                on='mcrm_line',
+                how='left_outer',
+            ).select(
+                'elig_status',
+                'mcrm_line',
+                'prm_line',
+                'admits',
+                'risk_score_avg',
+                spark_funcs.when(
+                    spark_funcs.col('factor_util').isNull(),
+                    spark_funcs.lit(1)
+                ).otherwise(
+                    spark_funcs.col('factor_util')
+                ).alias('factor_util'),
+                spark_funcs.when(
+                    spark_funcs.col('risk_score_avg').between(
+                        spark_funcs.col('hcc_range_bottom'),
+                        spark_funcs.col('hcc_range_top'),
+                        ),
+                    spark_funcs.lit('Y'),
+                ).otherwise(
+                    spark_funcs.when(
+                        spark_funcs.col('factor_util').isNull(),
+                        spark_funcs.lit('Y')
+                    ).otherwise(
+                        spark_funcs.lit('N')
+                    )
+                ).alias('keep_flag'),
+            ).where(
+                spark_funcs.col('keep_flag') == 'Y'
+            ).withColumn(
+                'admits_riskadj',
+                spark_funcs.col('admits')*spark_funcs.col('factor_util'),
+            )
+                
+    acute = outclaims_util.select(
+            'elig_status',
+            spark_funcs.lit('acute').alias('metric_id'),
+            'admits',
+            ).groupBy(
+                'elig_status',
+                'metric_id',
+            ).agg(
+                spark_funcs.sum('admits').alias('metric_value')
+            ).union(
+                outclaims_util.select(
+                    'elig_status',
+                    spark_funcs.lit('acute_riskadj').alias('metric_id'),
+                    'admits_riskadj',
+                ).groupBy(
+                    'elig_status',
+                    'metric_id',
+                ).agg(
+                    spark_funcs.sum('admits_riskadj').alias('metric_value')
+                )
+            )
+    
+    med = outclaims_util.where(
+            spark_funcs.col('mcrm_line') == 'I11'
+            ).select(
+                'elig_status',
+                spark_funcs.lit('medical').alias('metric_id'),
+                'admits',
+            ).groupBy(
+                'elig_status',
+                'metric_id',
+            ).agg(
+                spark_funcs.sum('admits').alias('metric_value')
+            ).union(
+                outclaims_util.select(
+                    'elig_status',
+                    spark_funcs.lit('medical_riskadj').alias('metric_id'),
+                    'admits_riskadj',
+                ).groupBy(
+                    'elig_status',
+                    'metric_id',
+                ).agg(
+                    spark_funcs.sum('admits_riskadj').alias('metric_value')
+                )
+            )
+    
+    med_gen = outclaims_util.where(
             spark_funcs.col('prm_line') == 'I11a'
             ).select(
                 'elig_status',
                 spark_funcs.lit('medical_general').alias('metric_id'),
-                'prm_admits',
+                'admits',
             ).groupBy(
                 'elig_status',
                 'metric_id',
             ).agg(
-                spark_funcs.sum('prm_admits').alias('admits'),
+                spark_funcs.sum('admits').alias('metric_value')
+            ).union(
+                outclaims_util.select(
+                    'elig_status',
+                    spark_funcs.lit('medical_general_riskadj').alias('metric_id'),
+                    'admits_riskadj',
+                ).groupBy(
+                    'elig_status',
+                    'metric_id',
+                ).agg(
+                    spark_funcs.sum('admits_riskadj').alias('metric_value')
+                )
             )
-    
+
+    surgery = outclaims_util.where(
+            spark_funcs.col('mcrm_line') == 'I12'
+            ).select(
+                'elig_status',
+                spark_funcs.lit('surgical').alias('metric_id'),
+                'admits',
+            ).groupBy(
+                'elig_status',
+                'metric_id',
+            ).agg(
+                spark_funcs.sum('admits').alias('metric_value')
+            ).union(
+                outclaims_util.select(
+                    'elig_status',
+                    spark_funcs.lit('surgical_riskadj').alias('metric_id'),
+                    'admits_riskadj',
+                ).groupBy(
+                    'elig_status',
+                    'metric_id',
+                ).agg(
+                    spark_funcs.sum('admits_riskadj').alias('metric_value')
+                )
+            )
+                
     type_union = acute.union(
-            med_surg
+                med
             ).union(
                 med_gen
-            ).withColumnRenamed(
-                    'admits', 
-                    'metric_value'
+            ).union(
+                surgery
             )
     
     return type_union
@@ -283,8 +387,7 @@ def calc_discharges(
        ) -> "DataFrame":
         
     outclaims_disch = outclaims.where(
-            (spark_funcs.col('prm_line').like('I%')) &
-            (spark_funcs.col('prm_line') != 'I31')
+            spark_funcs.col('prm_line') != 'I31'
             )
     
     discharges = outclaims_disch.select(
@@ -330,8 +433,7 @@ def calc_readmits(
        ) -> "DataFrame":
         
     outclaims_readmits = outclaims.where(
-            (spark_funcs.col('prm_line').like('I%')) &
-            (spark_funcs.col('prm_line') != 'I31')
+            spark_funcs.col('prm_line') != 'I31'
             )
     
     potential = outclaims_readmits.where(
@@ -401,12 +503,14 @@ def main() -> int:
                     min_incurred_date,
                     max_incurred_date,)
             ).withColumn(
-                    'month',
-                    date_as_month(spark_funcs.col('prm_fromdate'))
+                'month',
+                date_as_month(spark_funcs.col('prm_fromdate'))
             ).join(
-                    decor_limited,
-                    on=['member_id', 'caseadmitid'],
-                    how='left_outer'
+                decor_limited,
+                on=['member_id', 'caseadmitid'],
+                how='left_outer'
+            ).where(
+                spark_funcs.col('prm_line').like('I%')
             )
             
     outclaims_mem = outclaims.join(
