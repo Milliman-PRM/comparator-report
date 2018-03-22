@@ -20,7 +20,7 @@ META_SHARED = comparator_report.meta.project.gather_metadata()
 NAME_MODULE = 'outputs'
 PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
 PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
-PATH_RISKADJ = META_SHARED[15, 'out']
+PATH_REFS = META_SHARED[15, 'out']
 
 runout = 3
 
@@ -51,6 +51,11 @@ def main() -> int:
                 
     member_months = dfs_input['member_months']
 
+    ref_link_mcrm_line = read_sas_data(
+        sparkapp,
+        PATH_REFS / 'link_mr_mcrm_line.sas7bdat',
+    )
+    
     outclaims = dfs_input['outclaims'].where(
             spark_funcs.col('prm_fromdate').between(
                     min_incurred_date,
@@ -61,17 +66,21 @@ def main() -> int:
             )
             
     outclaims_mem = outclaims.join(
-                    member_months,
-                    on=(outclaims.member_id == member_months.member_id)
-                       & (outclaims.month == member_months.elig_month),
-                    how = 'inner'
+                member_months,
+                on=(outclaims.member_id == member_months.member_id)
+                   & (outclaims.month == member_months.elig_month),
+                how = 'inner'
+            ).join(
+                ref_link_mcrm_line.where(spark_funcs.col('lob') == 'Medicare'),
+                on=(outclaims_mem.prm_line == ref_link_mcrm_line.mr_line),
+                how='inner',
             )
     
     costmodel = outclaims_mem.select(
                 spark_funcs.lit(META_SHARED['name_client']).alias('name_client'),
                 spark_funcs.lit(time_period).alias('time_period'),
                 'prm_line',
-                spark_funcs.col('prm_line').substr(1, 3).alias('mcrm_line'),
+                'mcrm_line',
                 'elig_status',
                 spark_funcs.col('prm_oon_yn').alias('prv_net_aco_yn'),
                 'prm_admits',
@@ -116,9 +125,19 @@ def main() -> int:
                     spark_funcs.lit('_'),                    
                     spark_funcs.col('elig_status'),
                     spark_funcs.lit('_'),                    
-                    spark_funcs.col('prm_line'),
+                    spark_funcs.when(
+                        spark_funcs.col('mcrm_line') == 'x99',
+                        spark_funcs.lit('oth'),
+                        ).otherwise(
+                            spark_funcs.col('prm_line')
+                        ),
                     spark_funcs.lit('_'),                    
-                    spark_funcs.col('mcrm_line')
+                    spark_funcs.when(
+                        spark_funcs.col('mcrm_line') == 'x99',
+                        spark_funcs.lit('oth'),
+                        ).otherwise(
+                            spark_funcs.col('mcrm_line')
+                        )
                 )
             )
                 
