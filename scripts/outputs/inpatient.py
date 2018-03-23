@@ -204,7 +204,9 @@ def calc_one_day(
     return one_day
 
 def calc_risk_adj(
-        outclaims: "DataFrame"
+        outclaims: "DataFrame",
+        member_months: "DataFrame",
+        hcc_risk_adj: "DataFrame"
         ) -> "DataFrame":
         
     outclaims_ra = outclaims.where(
@@ -531,7 +533,7 @@ def main() -> int:
     
     one_day_summary = calc_one_day(outclaims_mem)
            
-    risk_adj_summary = calc_risk_adj(outclaims_mem)
+    risk_adj_summary = calc_risk_adj(outclaims_mem, member_months, hcc_risk_adj)
     
     discharges = calc_discharges(outclaims_mem)
     
@@ -548,6 +550,8 @@ def main() -> int:
             ).union(
                 readmit
             )
+    
+    hcc_risk_adj.unpersist()
     
     sparkapp.save_df(
             inpatient_metrics,
