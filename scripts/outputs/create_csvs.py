@@ -8,6 +8,7 @@
 import logging
 
 from prm.spark.app import SparkApp
+import pyspark.sql.functions as spark_funcs
 from prm.spark.io_txt import export_csv
 
 import comparator_report.meta.project
@@ -16,7 +17,9 @@ LOGGER = logging.getLogger(__name__)
 META_SHARED = comparator_report.meta.project.gather_metadata()
 
 NAME_MODULE = 'outputs'
-PATH_INPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
+PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
+PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
+runout = 3
 
 # =============================================================================
 # LIBRARIES, LOCATIONS, LITERALS, ETC. GO ABOVE HERE
@@ -27,9 +30,20 @@ def main() -> int:
     
     dfs_input = {
             path.stem: sparkapp.load_df(path)
-            for path in PATH_INPUTS.glob('*.parquet')
+            for path in PATH_OUTPUTS.glob('*.parquet')
             }
     
+    time_periods = sparkapp.load_df(PATH_INPUTS / 'time_periods.parquet')
+    
+    min_incurred_date, max_incurred_date = time_periods.where(
+            spark_funcs.col('months_of_claims_runout') == runout
+            ).select(
+                    spark_funcs.col('reporting_date_start').alias('min_incurred_date'),
+                    spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
+            ).collect()[0]
+    
+    time_period = str(min_incurred_date.year) + 'Q' + str((min_incurred_date.month - 1) // 3 + 1) + '_' + str(max_incurred_date.year) + 'Q' + str((max_incurred_date.month - 1) // 3 + 1)
+
     metrics_stack = dfs_input['basic_metrics'].union(
                 dfs_input['inpatient_metrics']
             ).union(
@@ -42,14 +56,39 @@ def main() -> int:
                 dfs_input['er_metrics']
             )
     
+    metrics_out = metrics_stack.select(
+                spark_funcs.lit(META_SHARED['name_client']).alias('name_client'),
+                spark_funcs.lit(time_period).alias('time_period'),
+                'elig_status',
+                spark_funcs.lit('').alias('metric_category'),
+                'metric_id',
+                spark_funcs.lit('').alias('metric_name'),
+                'metric_value',
+            ).withColumn(
+                'idx',
+                spark_funcs.regexp_replace(
+                    spark_funcs.concat(
+                        spark_funcs.col('name_client'),
+                        spark_funcs.lit('_'),
+                        spark_funcs.col('time_period'),
+                        spark_funcs.lit('_'),
+                        spark_funcs.col('elig_status'),
+                        spark_funcs.lit('_'),
+                        spark_funcs.col('metric_id'),
+                    ),
+                    ' ',
+                    ''
+                )
+            )
+    
     sparkapp.save_df(
-            metrics_stack,
+            metrics_out,
             PATH_INPUTS / 'metrics.parquet',
             )
     
     export_csv(
-        metrics_stack,
-        PATH_INPUTS / 'metrics.csv',
+        metrics_out,
+        PATH_INPUTS / 'metrics.txt',
         sep='|',
         header=True,
         single_file=True,
@@ -57,7 +96,7 @@ def main() -> int:
     
     export_csv(
         dfs_input['costmodel'],
-        PATH_INPUTS / 'cm_exp.csv',
+        PATH_INPUTS / 'cm_exp.txt',
         sep='|',
         header=True,
         single_file=True,
@@ -65,7 +104,7 @@ def main() -> int:
     
     export_csv(
         dfs_input['mem_out'],
-        PATH_INPUTS / 'mem.csv',
+        PATH_INPUTS / 'mem.txt',
         sep='|',
         header=True,
         single_file=True,
