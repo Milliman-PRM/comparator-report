@@ -118,26 +118,30 @@ def main() -> int:
                 'prm_coverage_type',
             ).withColumn(
                 'idx',
-                spark_funcs.concat(
-                    spark_funcs.col('name_client'),
-                    spark_funcs.lit('_'),
-                    spark_funcs.col('time_period'),
-                    spark_funcs.lit('_'),                    
-                    spark_funcs.col('elig_status'),
-                    spark_funcs.lit('_'),                    
-                    spark_funcs.when(
-                        spark_funcs.col('mcrm_line') == 'x99',
-                        spark_funcs.lit('oth'),
-                        ).otherwise(
-                            spark_funcs.col('prm_line')
-                        ),
-                    spark_funcs.lit('_'),                    
-                    spark_funcs.when(
-                        spark_funcs.col('mcrm_line') == 'x99',
-                        spark_funcs.lit('oth'),
-                        ).otherwise(
-                            spark_funcs.col('mcrm_line')
-                        )
+                spark_funcs.regexp_replace(
+                    spark_funcs.concat(
+                        spark_funcs.col('name_client'),
+                        spark_funcs.lit('_'),
+                        spark_funcs.col('time_period'),
+                        spark_funcs.lit('_'),                    
+                        spark_funcs.col('elig_status'),
+                        spark_funcs.lit('_'),                    
+                        spark_funcs.when(
+                            spark_funcs.col('mcrm_line') == 'x99',
+                            spark_funcs.lit('oth'),
+                            ).otherwise(
+                                spark_funcs.col('prm_line')
+                            ),
+                        spark_funcs.lit('_'),                    
+                        spark_funcs.when(
+                            spark_funcs.col('mcrm_line') == 'x99',
+                            spark_funcs.lit('oth'),
+                            ).otherwise(
+                                spark_funcs.col('mcrm_line')
+                            )
+                    ),
+                    ' ',
+                    ''
                 )
             )
             
