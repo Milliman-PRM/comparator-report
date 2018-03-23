@@ -170,6 +170,7 @@ def main() -> int:
                     distinct_snfs
                 )
                 
+    hcc_risk_adj.unpersist()
     
     sparkapp.save_df(
             snf_metrics,
