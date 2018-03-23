@@ -17,7 +17,7 @@ from indypy.nonstandard import promotion_tools
 
 LOGGER = logging.getLogger(__name__)
 
-PATH_RELEASE_NOTES = Path(os.environ["COMPARATOR_REPORT_HOME"]) / "docs" / "release-notes.md"
+PATH_RELEASE_NOTES = Path(os.environ["COMPARATOR_REPORT_HOME"]) / "Documentation" / "release-notes.md"
 PATH_PROMOTION = Path(r"S:\PRM\Pipeline_Components\comparator_report")
 
 # =============================================================================
