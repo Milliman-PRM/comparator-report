@@ -114,8 +114,7 @@ def main() -> int:
                        & (outclaims.month == member_months.elig_month),
                     how = 'inner'
             )
-    
-    
+       
     hcc_risk_adj = read_sas_data(
             sparkapp,
             PATH_RISKADJ / 'mcrm_hcc_calibrations.sas7bdat',
@@ -183,6 +182,7 @@ def main() -> int:
                     unclassified
                 )
                 
+    hcc_risk_adj.unpersist()
     
     sparkapp.save_df(
             er_metrics,
