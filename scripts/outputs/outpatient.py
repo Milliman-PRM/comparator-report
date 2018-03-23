@@ -30,6 +30,8 @@ runout = 3
 
 def metric_calc(
         outclaims: "DataFrame",
+        risk_score: "DataFrame",
+        hcc_risk_adj: "DataFrame",
         mr_line: "String",
         metric_id: "String",
         ) -> "DataFrame":
@@ -150,12 +152,12 @@ def main() -> int:
             PATH_RISKADJ / 'mcrm_hcc_calibrations.sas7bdat',
             )
     
-    hi_tec_img = metric_calc(outclaims_mem, 'O14', 'high_tech_imaging')
-    obs_stays = metric_calc(outclaims_mem, 'O10', 'observation_stays')
-    hi_tec_img_fop = metric_calc(outclaims_mem, 'P57', 'hi_tec_img_fop')
-    hi_tec_img_office = metric_calc(outclaims_mem, 'P59', 'hi_tec_img_office')
-    urg_care = metric_calc(outclaims_mem, 'P33', 'urgent_care_prof')
-    office_vis = metric_calc(outclaims_mem, 'P32', 'office_visits')
+    hi_tec_img = metric_calc(outclaims_mem, risk_score, hcc_risk_adj, 'O14', 'high_tech_imaging')
+    obs_stays = metric_calc(outclaims_mem, risk_score, hcc_risk_adj, 'O10', 'observation_stays')
+    hi_tec_img_fop = metric_calc(outclaims_mem, risk_score, hcc_risk_adj, 'P57', 'hi_tec_img_fop')
+    hi_tec_img_office = metric_calc(outclaims_mem, risk_score, hcc_risk_adj, 'P59', 'hi_tec_img_office')
+    urg_care = metric_calc(outclaims_mem, risk_score, hcc_risk_adj, 'P33', 'urgent_care_prof')
+    office_vis = metric_calc(outclaims_mem, risk_score, hcc_risk_adj, 'P32', 'office_visits')
     
     outpatient_metrics = hi_tec_img.union(
                 obs_stays
@@ -168,6 +170,8 @@ def main() -> int:
             ).union(
                 office_vis
             )
+    
+    hcc_risk_adj.unpersist()
     
     sparkapp.save_df(
             outpatient_metrics,
