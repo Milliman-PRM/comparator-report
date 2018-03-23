@@ -89,7 +89,7 @@ def main() -> int:
                 'elig_status',
             ).agg(
                 spark_funcs.sum('riskscr_wt').alias('riskscr_wgt'),
-                spark_funcs.sum('age').alias('Total_Age'),
+                spark_funcs.sum('age').alias('total_age'),
                 spark_funcs.count('member_id').alias('memcnt'),
             ).select(
                 spark_funcs.lit(META_SHARED['name_client']).alias('name_client'),
@@ -110,7 +110,7 @@ def main() -> int:
                 'riskscr_wgt',
                 spark_funcs.lit('').alias('riskscr_cred'),
                 'memcnt',
-                'Total_Age',
+                'total_age',
             ).withColumn(
                 'idx',
                 spark_funcs.concat(
