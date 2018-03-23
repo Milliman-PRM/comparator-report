@@ -107,18 +107,23 @@ def main() -> int:
                 spark_funcs.lit('').alias('final_hospice_days'),
                 spark_funcs.lit('').alias('costs_final_30_days_sum'),
                 spark_funcs.lit('').alias('risk_score_type'),
+                spark_funcs.lit('').alias('riskscr_avg'),
                 'riskscr_wgt',
                 spark_funcs.lit('').alias('riskscr_cred'),
                 'memcnt',
                 'total_age',
             ).withColumn(
                 'idx',
-                spark_funcs.concat(
-                    spark_funcs.col('name_client'),
-                    spark_funcs.lit('_'),
-                    spark_funcs.col('time_period'),
-                    spark_funcs.lit('_'),
-                    spark_funcs.col('elig_status')
+                spark_funcs.regexp_replace(
+                    spark_funcs.concat(
+                        spark_funcs.col('name_client'),
+                        spark_funcs.lit('_'),
+                        spark_funcs.col('time_period'),
+                        spark_funcs.lit('_'),
+                        spark_funcs.col('elig_status')
+                    ),
+                    ' ',
+                    ''
                 )
             )              
 
