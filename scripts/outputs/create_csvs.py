@@ -88,7 +88,7 @@ def main() -> int:
     
     export_csv(
         metrics_out,
-        PATH_INPUTS / 'metrics.txt',
+        PATH_OUTPUTS / 'metrics.txt',
         sep='|',
         header=True,
         single_file=True,
@@ -96,7 +96,7 @@ def main() -> int:
     
     export_csv(
         dfs_input['costmodel'],
-        PATH_INPUTS / 'cm_exp.txt',
+        PATH_OUTPUTS / 'cm_exp.txt',
         sep='|',
         header=True,
         single_file=True,
@@ -104,7 +104,7 @@ def main() -> int:
     
     export_csv(
         dfs_input['mem_out'],
-        PATH_INPUTS / 'mem.txt',
+        PATH_OUTPUTS / 'mem.txt',
         sep='|',
         header=True,
         single_file=True,
