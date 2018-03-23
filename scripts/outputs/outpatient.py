@@ -170,13 +170,13 @@ def main() -> int:
             ).union(
                 office_vis
             )
-    
-    hcc_risk_adj.unpersist()
-    
+       
     sparkapp.save_df(
             outpatient_metrics,
             PATH_OUTPUTS / 'outpatient_metrics.parquet',
             )
+
+    hcc_risk_adj.unpersist()
 
     return 0
 

@@ -181,13 +181,13 @@ def main() -> int:
                 ).union(
                     unclassified
                 )
-                
-    hcc_risk_adj.unpersist()
-    
+                    
     sparkapp.save_df(
             er_metrics,
             PATH_OUTPUTS / 'er_metrics.parquet',
             )
+
+    hcc_risk_adj.unpersist()
 
     return 0
 

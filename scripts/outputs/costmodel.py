@@ -140,13 +140,13 @@ def main() -> int:
                         )
                 )
             )
-
-    ref_link_mcrm_line.unpersist()
             
     sparkapp.save_df(
             costmodel,
             PATH_OUTPUTS / 'costmodel.parquet',
             )
+
+    ref_link_mcrm_line.unpersist()
 
     return 0
 

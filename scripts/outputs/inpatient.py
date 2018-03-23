@@ -550,13 +550,13 @@ def main() -> int:
             ).union(
                 readmit
             )
-    
-    hcc_risk_adj.unpersist()
-    
+        
     sparkapp.save_df(
             inpatient_metrics,
             PATH_OUTPUTS / 'inpatient_metrics.parquet',
             )
+
+    hcc_risk_adj.unpersist()
 
     return 0
 

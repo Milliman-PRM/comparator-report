@@ -169,13 +169,13 @@ def main() -> int:
                 ).union(
                     distinct_snfs
                 )
-                
-    hcc_risk_adj.unpersist()
     
     sparkapp.save_df(
             snf_metrics,
             PATH_OUTPUTS / 'snf_metrics.parquet',
             )
+    
+    hcc_risk_adj.unpersist()
 
     return 0
 
