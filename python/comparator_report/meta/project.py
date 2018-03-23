@@ -116,7 +116,7 @@ def _make_project_folders(
 
 def setup_project() -> None:
     """Prepare a PRM project for comparator report"""
-    prm_meta = prm_ny_data_share.meta.project.parse_project_metadata()
+    prm_meta = prm_ny_data_share.meta.project.gather_metadata()
     meta_new = _derive_additional_metadata(prm_meta)
 
     _make_project_folders(meta_new)
