@@ -74,14 +74,15 @@ def calc_pqi(
     return pqis
 
 def calc_psa(
-        outclaims: "DataFrame"
+        outclaims: "DataFrame",
+        ref_psa: "DataFrame"
         ) -> "DataFrame":
     
     outclaims_psa = outclaims.where(
             (spark_funcs.col('prm_pref_sensitive_category') != 'Not PSA') &
             (spark_funcs.col('prm_line') != 'I31')
             )
-                
+             
     psa_gen = outclaims_psa.select(
             'elig_status',
             'prm_admits',
@@ -93,13 +94,24 @@ def calc_psa(
 
     psa_ind = outclaims_psa.select(
             'elig_status',
-            spark_funcs.col('prm_pref_sensitive_category').alias('pref_sense_cat'),
+            'prm_pref_sensitive_category',
             'prm_admits',
             ).groupBy(
                 'elig_status',
-                'pref_sense_cat',
+                'prm_pref_sensitive_category',
             ).agg(
                 spark_funcs.sum('prm_admits').alias('metric_value')
+            ).join(
+                ref_psa,
+                on='prm_pref_sensitive_category',
+                how='left_outer',
+            ).select(
+                'elig_status',
+                spark_funcs.concat(
+                    spark_funcs.lit('psa_admits_'),
+                    spark_funcs.col('metric_id'),
+                ).alias('metric_id'),
+                'metric_value',
             )
     
     psas = psa_gen.select(
@@ -107,14 +119,7 @@ def calc_psa(
             spark_funcs.lit('pref_sens').alias('metric_id'),
             'metric_value',
             ).union(
-                psa_ind.withColumn(
-                    'metric_id',
-                    spark_funcs.concat(spark_funcs.col('pref_sense_cat'), spark_funcs.lit('_admits'))
-                ).select(
-                    'elig_status',
-                    'metric_id',
-                    'metric_value',
-                )
+                psa_ind
             )
             
     return psas
@@ -397,29 +402,21 @@ def calc_discharges(
             spark_funcs.when(
                 spark_funcs.col('dischargestatus') == '01',
                 spark_funcs.lit('discharge_to_home'),
-                ).otherwise(
-                    spark_funcs.when(
-                        spark_funcs.col('dischargestatus') == '03',
-                        spark_funcs.lit('discharge_to_snf'),
-                    ).otherwise(
-                        spark_funcs.when(
-                            spark_funcs.col('dischargestatus') == '06',
-                            spark_funcs.lit('discharge_to_home_health')
-                        ).otherwise(
-                            spark_funcs.when(
-                                spark_funcs.col('dischargestatus') == '20',
-                                spark_funcs.lit('discharge_to_death')
-                            ).otherwise(
-                                spark_funcs.when(
-                                    spark_funcs.col('dischargestatus') == '62',
-                                    spark_funcs.lit('discharge_to_irf')
-                                ).otherwise(
-                                    spark_funcs.lit('discharge_to_other'),
-                                )
-                            )
-                        )
-                    )
-                ).alias('metric_id'),
+            ).when(
+                spark_funcs.col('dischargestatus') == '03',
+                spark_funcs.lit('discharge_to_snf'),
+            ).when(
+                spark_funcs.col('dischargestatus') == '06',
+                spark_funcs.lit('discharge_to_home_health')
+            ).when(
+                spark_funcs.col('dischargestatus') == '20',
+                spark_funcs.lit('discharge_to_death')
+            ).when(
+                spark_funcs.col('dischargestatus') == '62',
+                spark_funcs.lit('discharge_to_irf')
+            ).otherwise(
+                spark_funcs.lit('discharge_to_other'),
+            ).alias('metric_id'),
             'prm_admits',
         ).groupBy(
             'elig_status',
@@ -499,6 +496,20 @@ def main() -> int:
                 if column.startswith('prm_pref_')
             ],
             )
+    ref_psa = sparkapp.session.createDataFrame(
+        [('Knee Replacement', 'kneereplacement'),
+         ('CABG/PTCA (DRG)', 'cabgptcadrg'),
+         ('TURP', 'turp'),
+         ('Bariatric Surgery', 'bariatricsurgery'),
+         ('TURP (DRG)', 'turpdrg'),
+         ('Hip Replacement', 'hipreplacement'),
+         ('PTCA', 'ptca'),
+         ('Laminectomy/Spinal Fusion', 'laminectomyspinalfusi'),
+         ('Hysterectomy', 'hysterectomy'),
+         ('CABG', 'cabg'),
+         ('Hip/Knee Replacement (DRG)', 'hipkneereplacementdrg')],
+        schema=['prm_pref_sensitive_category', 'metric_id']
+    )
     
     outclaims = dfs_input['outclaims'].where(
             spark_funcs.col('prm_fromdate').between(
@@ -529,7 +540,7 @@ def main() -> int:
     
     pqi_summary = calc_pqi(outclaims_mem)
     
-    psa_summary = calc_psa(outclaims_mem)
+    psa_summary = calc_psa(outclaims_mem, ref_psa)
     
     one_day_summary = calc_one_day(outclaims_mem)
            
