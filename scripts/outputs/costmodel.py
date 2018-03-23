@@ -72,7 +72,7 @@ def main() -> int:
                 how = 'inner'
             ).join(
                 ref_link_mcrm_line.where(spark_funcs.col('lob') == 'Medicare'),
-                on=(outclaims_mem.prm_line == ref_link_mcrm_line.mr_line),
+                on=(outclaims.prm_line == ref_link_mcrm_line.mr_line),
                 how='inner',
             )
     
@@ -140,7 +140,9 @@ def main() -> int:
                         )
                 )
             )
-                
+
+    ref_link_mcrm_line.unpersist()
+            
     sparkapp.save_df(
             costmodel,
             PATH_OUTPUTS / 'costmodel.parquet',
