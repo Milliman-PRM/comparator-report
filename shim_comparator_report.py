@@ -15,6 +15,8 @@ from indypy.nonstandard.ext_luigi import mutate_config
 import prm_ny_data_share.meta.project
 import comparator_report.meta.project
 
+from comparator_report.pipeline.definitions.outputs import CreateCSVs
+
 LOGGER = logging.getLogger(__name__)
 
 # =============================================================================
