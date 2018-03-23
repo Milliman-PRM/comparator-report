@@ -27,7 +27,7 @@ def main() -> int:
     
     dfs_input = {
             path.stem: sparkapp.load_df(path)
-            for path in PATH_INPUTS.glob('*metrics.parquet')
+            for path in PATH_INPUTS.glob('*.parquet')
             }
     
     metrics_stack = dfs_input['basic_metrics'].union(
