@@ -567,4 +567,4 @@ if __name__ == '__main__':
     with SparkApp(META_SHARED['pipeline_signature'], **SPARK_DEFAULTS_PRM):
         RETURN_CODE = main()
     
-    sys.exist(RETURN_CODE)
+    sys.exit(RETURN_CODE)
