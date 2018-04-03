@@ -17,7 +17,7 @@ from indypy.nonstandard import promotion_tools
 
 LOGGER = logging.getLogger(__name__)
 
-PATH_RELEASE_NOTES = Path(os.environ["COMPARATOR_REPORT_HOME"]) / "docs" / "release-notes.md"
+PATH_RELEASE_NOTES = Path(os.environ["COMPARATOR_REPORT_HOME"]) / "Documentation" / "release-notes.md"
 PATH_PROMOTION = Path(r"S:\PRM\Pipeline_Components\comparator_report")
 
 # =============================================================================
@@ -28,7 +28,7 @@ PATH_PROMOTION = Path(r"S:\PRM\Pipeline_Components\comparator_report")
 def main() -> int:
     """Promotion process"""
     LOGGER.info("Beginning code promotion for product component")
-    github_repository = repo.GithubRepository.from_parts("NYHealth", "comparator_report")
+    github_repository = repo.GithubRepository.from_parts("NYHealth", "comparator-report")
     version = promotion_tools.LocalVersion(
         input("Please enter the version number for this release (e.g. v1.2.3): "),
         partial=True,

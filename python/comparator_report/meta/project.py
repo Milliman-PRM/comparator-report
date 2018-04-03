@@ -1,7 +1,9 @@
 """
 ### CODE OWNERS: Ben Copeland, Umang Gupta
+
 ### OBJECTIVE:
   Tools for managing metadata and project structure
+  
 ### DEVELOPER NOTES:
   Metadata will leverage PRM analytics-pipeline metadata
 """
@@ -11,7 +13,7 @@ import datetime
 import os
 from pathlib import Path
 
-import prm.meta.project
+import prm_ny_data_share.meta.project
 
 LOGGER = logging.getLogger(__name__)
 
@@ -34,7 +36,7 @@ def _derive_additional_metadata(
 
 def gather_metadata() -> typing.Mapping:
     """Collect PRM metadata and component metadata"""
-    meta = prm.meta.project.parse_project_metadata()
+    meta = prm_ny_data_share.meta.project.gather_metadata()
     meta.update(
         _derive_additional_metadata(meta)
         )
@@ -69,7 +71,7 @@ def _write_metadata_to_sas(
     try:
         _filename = __file__
     except NameError:
-        _filename = 'prm_ny_data_share.meta.project._write_metadata_to_sas'
+        _filename = 'comparator_report.meta.project._write_metadata_to_sas'
 
     with path_output.open('w', newline='') as fh_out:
         fh_out.write('/*Define macro variables for PRM/NYHealth data share*/\n')
@@ -114,7 +116,7 @@ def _make_project_folders(
 
 def setup_project() -> None:
     """Prepare a PRM project for comparator report"""
-    prm_meta = prm.meta.project.parse_project_metadata()
+    prm_meta = prm_ny_data_share.meta.project.gather_metadata()
     meta_new = _derive_additional_metadata(prm_meta)
 
     _make_project_folders(meta_new)

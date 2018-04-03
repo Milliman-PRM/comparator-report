@@ -1,21 +1,15 @@
 """
-### CODE OWNERS: Umang Gupta, Pierre Cornell
+### CODE OWNERS: Ben Copeland, Jason Altieri
 
 ### OBJECTIVE:
-  Run the comaprator report pipeline
+  Prepare ACO insights for processing
 
 ### DEVELOPER NOTES:
   Uses shared metadata from PRM
 """
 import logging
-import luigi
 
-from indypy.nonstandard.ext_luigi import mutate_config
-
-import prm_ny_data_share.meta.project
 import comparator_report.meta.project
-
-from comparator_report.pipeline.definitions.outputs import CreateCSVs
 
 LOGGER = logging.getLogger(__name__)
 
@@ -27,15 +21,10 @@ LOGGER = logging.getLogger(__name__)
 
 def main() -> int:
     """A function to enclose the execution of business logic."""
-    LOGGER.info('Running Comparator Report with Luigi')
+    LOGGER.info('Preparing project for shared data warehouse processing')
 
-    prm_ny_data_share.meta.project.setup_project()
     comparator_report.meta.project.setup_project()
-    META_SHARED = comparator_report.meta.project.gather_metadata()
-
-    mutate_config()
-
-    return int(not luigi.build([CreateCSVs(META_SHARED['pipeline_signature'])]))
+    return 0
 
 
 if __name__ == '__main__':
