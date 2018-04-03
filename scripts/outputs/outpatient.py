@@ -96,6 +96,75 @@ def metric_calc(
     
     return metric
 
+def metric_calc_ov(
+        outclaims: "DataFrame",
+        risk_score: "DataFrame",
+        hcc_risk_adj: "DataFrame",
+        metric_id: "String",
+        ) -> "DataFrame":
+    
+    outclaims_mcrm = outclaims.withColumn(
+                'mcrm_line',
+                spark_funcs.col('prm_line')
+            ).filter(
+                spark_funcs.col('mcrm_line').isin(
+                    'P32c', 'P32d'
+                )
+            )
+    
+    util = outclaims_mcrm.select(
+                'elig_status',
+                'mcrm_line',
+                'prm_util',
+            ).groupBy(
+                'elig_status',
+                'mcrm_line',
+            ).agg(
+                spark_funcs.sum('prm_util').alias('util')
+            )
+    
+    util_adj = util.join(
+                risk_score,
+                on='elig_status',
+                how='inner',
+            ).join(
+                hcc_risk_adj,
+                on='mcrm_line',
+                how='left_outer',
+            ).where(
+                spark_funcs.col('risk_score_avg').between(
+                    spark_funcs.col('hcc_range_bottom'),
+                    spark_funcs.col('hcc_range_top')
+                )
+            ).withColumn(
+                'util_riskadj',
+                spark_funcs.col('util') / spark_funcs.col('factor_util')
+            )
+                
+    metric = util_adj.select(
+                'elig_status',
+                spark_funcs.lit(metric_id).alias('metric_id'),
+                'util'
+            ).groupBy(
+                'elig_status',
+                'metric_id',
+            ).agg(
+                spark_funcs.sum('util').alias('metric_value')
+            ).union(
+                util_adj.select(
+                    'elig_status',
+                    spark_funcs.lit(metric_id + '_riskadj').alias('metric_id'),
+                    'util_riskadj',
+                ).groupBy(
+                    'elig_status',
+                    'metric_id',
+                ).agg(
+                    spark_funcs.sum('util_riskadj').alias('metric_value')
+                )
+            )
+    
+    return metric
+
 def main() -> int:
     sparkapp = SparkApp(META_SHARED['pipeline_signature'])
     
@@ -157,7 +226,7 @@ def main() -> int:
     hi_tec_img_fop = metric_calc(outclaims_mem, risk_score, hcc_risk_adj, 'P57', 'hi_tec_img_fop')
     hi_tec_img_office = metric_calc(outclaims_mem, risk_score, hcc_risk_adj, 'P59', 'hi_tec_img_office')
     urg_care = metric_calc(outclaims_mem, risk_score, hcc_risk_adj, 'P33', 'urgent_care_prof')
-    office_vis = metric_calc(outclaims_mem, risk_score, hcc_risk_adj, 'P32', 'office_visits')
+    office_vis = metric_calc_ov(outclaims_mem, risk_score, hcc_risk_adj, 'office_visits')
     
     outpatient_metrics = hi_tec_img.union(
                 obs_stays
