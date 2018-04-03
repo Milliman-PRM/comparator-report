@@ -282,7 +282,7 @@ def calc_risk_adj(
                 spark_funcs.col('keep_flag') == 'Y'
             ).withColumn(
                 'admits_riskadj',
-                spark_funcs.col('admits')*spark_funcs.col('factor_util'),
+                spark_funcs.col('admits') / spark_funcs.col('factor_util'),
             )
                 
     acute = outclaims_util.select(

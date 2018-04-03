@@ -69,7 +69,7 @@ def metric_calc(
                 )
             ).withColumn(
                 'util_riskadj',
-                spark_funcs.col('util')*spark_funcs.col('factor_util')
+                spark_funcs.col('util') / spark_funcs.col('factor_util')
             )
                 
     metric = util_adj.select(

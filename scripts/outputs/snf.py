@@ -112,7 +112,7 @@ def main() -> int:
                 )
             ).withColumn(
                 'admits_riskadj',
-                spark_funcs.col('metric_value')*spark_funcs.col('factor_util')
+                spark_funcs.col('metric_value') / spark_funcs.col('factor_util')
             )
                 
     over_21 = outclaims_mem.where(

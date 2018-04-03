@@ -148,7 +148,7 @@ def main() -> int:
                 )
             ).withColumn(
                 'util_riskadj',
-                spark_funcs.col('metric_value')*spark_funcs.col('factor_util')
+                spark_funcs.col('metric_value') / spark_funcs.col('factor_util')
             )
     
     non_avoidable = nyu_measures(outclaims_mem, 'prm_nyu_emergent_non_avoidable', 'ED_emer_nec')
