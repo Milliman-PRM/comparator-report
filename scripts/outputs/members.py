@@ -84,20 +84,20 @@ def main() -> int:
             how='inner')
     
     member_join = member_months.join(
-                    recent_info,
-                    on=['member_id', 'elig_month'],
-                    how='inner'
-                  ).join(
-                    risk_scores,
-                    on='member_id',
-                    how='left_outer'
-                  ).select(
-                    'member_id',
-                    'elig_month',
-                    spark_funcs.col('elig_status_1').alias('elig_status'),
-                    member_months.memmos,
-                    'risk_score',
-                  )
+                recent_info,
+                on=['member_id', 'elig_month'],
+                how='inner'
+           ).join(
+                risk_scores,
+                on='member_id',
+                how='left_outer'
+           ).select(
+                'member_id',
+                'elig_month',
+                spark_funcs.col('elig_status_1').alias('elig_status'),
+                member_months.memmos,
+                'risk_score',
+           )
        
     sparkapp.save_df(
             member_join,

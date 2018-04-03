@@ -222,9 +222,9 @@ def calc_risk_adj(
             )
 
     risk_score = member_months.select(
-            'elig_status',
-            'memmos',
-            'risk_score',
+                'elig_status',
+                'memmos',
+                'risk_score',
             ).groupBy(
                 'elig_status',
             ).agg(
@@ -232,10 +232,10 @@ def calc_risk_adj(
             )
    
     outclaims_admits = outclaims_ra.select(
-            'elig_status',
-            'prm_line',
-            'mcrm_line',
-            'prm_admits',
+                'elig_status',
+                'prm_line',
+                'mcrm_line',
+                'prm_admits',
             ).groupBy(
                 'elig_status',
                 'prm_line',
@@ -286,9 +286,9 @@ def calc_risk_adj(
             )
                 
     acute = outclaims_util.select(
-            'elig_status',
-            spark_funcs.lit('acute').alias('metric_id'),
-            'admits',
+                'elig_status',
+                spark_funcs.lit('acute').alias('metric_id'),
+                'admits',
             ).groupBy(
                 'elig_status',
                 'metric_id',
@@ -496,6 +496,7 @@ def main() -> int:
                 if column.startswith('prm_pref_')
             ],
             )
+    
     ref_psa = sparkapp.session.createDataFrame(
         [('Knee Replacement', 'kneereplacement'),
          ('CABG/PTCA (DRG)', 'cabgptcadrg'),
