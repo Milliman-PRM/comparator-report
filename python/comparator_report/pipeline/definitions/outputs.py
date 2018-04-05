@@ -80,6 +80,33 @@ class Inpatient(PRMPythonTask): # pragma: no cover
         )
         # pylint: enable=arguments-differ
 
+class PAC(PRMPythonTask): # pragma: no cover
+    """Run pac.py"""
+
+    requirements = RequirementsContainer(
+        Members,
+    )
+
+    def output(self):
+        names_output = {
+            'pac_metrics.parquet',
+        }
+        return [
+            IndyPyLocalTarget(META_SHARED['path_data_comparator_report'] / NAME_MODULE / name)
+            for name in names_output
+        ]
+
+    def run(self):  # pylint: disable=arguments-differ
+        """Run the Luigi job"""
+        program = PATH_SCRIPTS / NAME_MODULE / "pac.py"
+        super().run(
+            program,
+            path_log=build_logfile_name(
+                program,
+                META_SHARED['path_logs_comparator_report'] / NAME_MODULE
+            )
+        )
+        # pylint: enable=arguments-differ
 
 class Outpatient(PRMPythonTask): # pragma: no cover
     """Run outpatient.py"""
@@ -291,6 +318,7 @@ class CreateCSVs(PRMPythonTask): # pragma: no cover
         BasicMetrics,
         EOL,
         Inpatient,
+        PAC,
         Outpatient,
         ER,
         SNF,
