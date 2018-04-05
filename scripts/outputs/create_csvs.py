@@ -54,6 +54,8 @@ def main() -> int:
                 dfs_input['snf_metrics']
             ).union(
                 dfs_input['er_metrics']
+            ).union(
+                dfs_input['pac_metrics']
             )
     
     metrics_out = metrics_stack.select(
