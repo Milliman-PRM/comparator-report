@@ -33,7 +33,6 @@ def calc_pqi(
     
     outclaims_pqi = outclaims.where(
             (spark_funcs.col('prm_ahrq_pqi') != 'none') &
-            (spark_funcs.col('prm_line').startswith('I')) &
             (spark_funcs.col('prm_line') != 'I31')
             )
     
@@ -81,7 +80,6 @@ def calc_psa(
     
     outclaims_psa = outclaims.where(
             (spark_funcs.col('prm_pref_sensitive_category') != 'Not PSA') &
-            (spark_funcs.col('prm_line').startswith('I')) &
             (spark_funcs.col('prm_line') != 'I31')
             )
              
@@ -131,8 +129,7 @@ def calc_one_day(
         ) -> "DataFrame":
     
     outclaims_od = outclaims.where(
-            (spark_funcs.col('prm_line').startswith('I')) &
-            (spark_funcs.col('prm_line') != 'I31')
+            spark_funcs.col('prm_line') != 'I31'
             )
     
     one_day_denom = outclaims_od.select(
@@ -218,8 +215,7 @@ def calc_risk_adj(
         ) -> "DataFrame":
         
     outclaims_ra = outclaims.where(
-            (spark_funcs.col('prm_line').startswith('I')) &
-            (spark_funcs.col('prm_line') != 'I31')
+            spark_funcs.col('prm_line') != 'I31'
             ).withColumn(
                 'mcrm_line',
                 spark_funcs.col('prm_line').substr(1, 3)
@@ -393,111 +389,50 @@ def calc_risk_adj(
     
     return type_union
             
-def calc_pac_metrics(
+def calc_discharges(
        outclaims: "DataFrame"
        ) -> "DataFrame":
         
-    outclaims_pac = outclaims.where(
-                spark_funcs.col('pac_index_yn') == 'Y'
+    outclaims_disch = outclaims.where(
+            spark_funcs.col('prm_line') != 'I31'
             )
     
-    pac_count = outclaims_pac.select(
-                'elig_status',
-                spark_funcs.lit('pac_epi').alias('metric_id'),
-                'prm_admits',
-            ).groupBy(
-                'elig_status',
-                'metric_id',
-            ).agg(
-                spark_funcs.sum('prm_admits').alias('metric_value')
-            )
-    
-    pac_died = outclaims_pac.where(
-                spark_funcs.col('pac_died_in_hospital_yn') == 'Y'
-            ).select(
-                'elig_status',
-                spark_funcs.lit('pac_died_in_hosp').alias('metric_id'),
-                'prm_admits',
-            ).groupBy(
-                'elig_status',
-                'metric_id',
-            ).agg(
-                spark_funcs.sum('prm_admits').alias('metric_value')
-            )
-    
-    pac_ipreadmit = outclaims_pac.where(
-                spark_funcs.col('pac_has_ip_acute_yn') == 'Y'
-            ).select(
-                'elig_status',
-                spark_funcs.lit('pac_ipreadmit').alias('metric_id'),
-                'prm_admits',
-            ).groupBy(
-                'elig_status',
-                'metric_id',
-            ).agg(
-                spark_funcs.sum('prm_admits').alias('metric_value')
-            )
-        
-    pac_snf = outclaims_pac.where(
-                spark_funcs.col('pac_has_snf_yn') == 'Y'
-            ).select(
-                'elig_status',
-                spark_funcs.lit('pac_snf').alias('metric_id'),
-                'prm_admits',
-            ).groupBy(
-                'elig_status',
-                'metric_id',
-            ).agg(
-                spark_funcs.sum('prm_admits').alias('metric_value')
-            )    
-
-    pac_rehab = outclaims_pac.where(
-                spark_funcs.col('pac_has_ip_rehab_yn') == 'Y'
-            ).select(
-                'elig_status',
-                spark_funcs.lit('pac_rehab').alias('metric_id'),
-                'prm_admits',
-            ).groupBy(
-                'elig_status',
-                'metric_id',
-            ).agg(
-                spark_funcs.sum('prm_admits').alias('metric_value')
-            )    
-    
-    pac_hh = outclaims_pac.where(
-                spark_funcs.col('pac_has_hh_yn') == 'Y'
-            ).select(
-                'elig_status',
-                spark_funcs.lit('pac_hh').alias('metric_id'),
-                'prm_admits',
-            ).groupBy(
-                'elig_status',
-                'metric_id',
-            ).agg(
-                spark_funcs.sum('prm_admits').alias('metric_value')
-            )
-
-    pac_metrics = pac_count.union(
-                pac_died
-            ).union(
-                pac_ipreadmit
-            ).union(
-                pac_snf
-            ).union(
-                pac_rehab
-            ).union(
-                pac_hh
-            )        
+    discharges = outclaims_disch.select(
+            'elig_status',
+            spark_funcs.when(
+                spark_funcs.col('dischargestatus') == '01',
+                spark_funcs.lit('discharge_to_home'),
+            ).when(
+                spark_funcs.col('dischargestatus') == '03',
+                spark_funcs.lit('discharge_to_snf'),
+            ).when(
+                spark_funcs.col('dischargestatus') == '06',
+                spark_funcs.lit('discharge_to_home_health')
+            ).when(
+                spark_funcs.col('dischargestatus') == '20',
+                spark_funcs.lit('discharge_to_death')
+            ).when(
+                spark_funcs.col('dischargestatus') == '62',
+                spark_funcs.lit('discharge_to_irf')
+            ).otherwise(
+                spark_funcs.lit('discharge_to_other'),
+            ).alias('metric_id'),
+            'prm_admits',
+        ).groupBy(
+            'elig_status',
+            'metric_id',
+        ).agg(
+            spark_funcs.sum('prm_admits').alias('metric_value')
+        )
                                 
-    return pac_metrics
+    return discharges
     
 def calc_readmits(
        outclaims: "DataFrame"
        ) -> "DataFrame":
         
     outclaims_readmits = outclaims.where(
-            (spark_funcs.col('prm_line').startswith('I')) &
-            (spark_funcs.col('prm_line') != 'I31')
+            spark_funcs.col('prm_line') != 'I31'
             )
     
     potential = outclaims_readmits.where(
@@ -529,69 +464,6 @@ def calc_readmits(
     metrics = potential.union(readmits)
     
     return metrics
-
-def calc_pac_episode_flags(
-        outclaims_with_case_decor: "DataFrame"
-    ) -> "DataFrame":
-    """Pre-calculate whether an episode has certain types of utilization"""
-    pac_case_counts = outclaims_with_case_decor.filter('pac_index_yn = "N"').select(
-        '*',
-        spark_funcs.when(
-            (
-                (spark_funcs.col('pac_major_category') == 'IP')
-                & (spark_funcs.col('pac_minor_category') == 'Acute')
-                ),
-            spark_funcs.col('prm_util'),
-            ).otherwise(
-                spark_funcs.lit(0)
-                ).alias('pac_ip_acute_days'),
-        spark_funcs.when(
-            (
-                (spark_funcs.col('pac_major_category') == 'IP')
-                & (spark_funcs.col('pac_minor_category') == 'Rehab')
-                ),
-            spark_funcs.col('prm_util'),
-            ).otherwise(
-                spark_funcs.lit(0)
-                ).alias('pac_ip_rehab_days'),
-        spark_funcs.when(
-            spark_funcs.col('pac_major_category') == 'SNF',
-            spark_funcs.col('prm_util'),
-            ).otherwise(
-                spark_funcs.lit(0)
-                ).alias('pac_snf_days'),
-        spark_funcs.when(
-            spark_funcs.col('pac_major_category') == 'HH',
-            spark_funcs.col('prm_util'),
-            ).otherwise(
-                spark_funcs.lit(0)
-                ).alias('pac_hh_visits'),
-    )
-    pac_case_summary = pac_case_counts.groupBy('pac_caseadmitid').agg(
-        spark_funcs.sum('pac_ip_acute_days').alias('pac_ip_acute_days'),
-        spark_funcs.sum('pac_ip_rehab_days').alias('pac_ip_rehab_days'),
-        spark_funcs.sum('pac_snf_days').alias('pac_snf_days'),
-        spark_funcs.sum('pac_hh_visits').alias('pac_hh_visits'),
-    ).select(
-        'pac_caseadmitid',
-        spark_funcs.when(
-            spark_funcs.col('pac_ip_acute_days') > 0,
-            spark_funcs.lit('Y')
-            ).otherwise('N').alias('pac_has_ip_acute_yn'),
-        spark_funcs.when(
-            spark_funcs.col('pac_ip_rehab_days') > 0,
-            spark_funcs.lit('Y')
-            ).otherwise('N').alias('pac_has_ip_rehab_yn'),
-        spark_funcs.when(
-            spark_funcs.col('pac_snf_days') > 0,
-            spark_funcs.lit('Y')
-            ).otherwise('N').alias('pac_has_snf_yn'),
-        spark_funcs.when(
-            spark_funcs.col('pac_hh_visits') > 0,
-            spark_funcs.lit('Y')
-            ).otherwise('N').alias('pac_has_hh_yn'),
-    )
-    return pac_case_summary
     
 def main() -> int:
     sparkapp = SparkApp(META_SHARED['pipeline_signature'])
@@ -603,7 +475,6 @@ def main() -> int:
                     PATH_INPUTS / 'time_periods.parquet',
                     PATH_INPUTS / 'outclaims.parquet',
                     PATH_INPUTS / 'decor_case.parquet',
-                    PATH_INPUTS / 'members.parquet',
                     ]
             }
     
@@ -614,10 +485,7 @@ def main() -> int:
                     spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
             ).collect()[0]
     
-    member_months = dfs_input['member_months'].withColumnRenamed(
-                'member_id',
-                'member_id_mm'
-            )
+    member_months = dfs_input['member_months']
     
     decor_limited = dfs_input['decor_case'].select(
             'member_id',
@@ -655,60 +523,16 @@ def main() -> int:
                 decor_limited,
                 on=['member_id', 'caseadmitid'],
                 how='left_outer'
+            ).where(
+                spark_funcs.col('prm_line').like('I%')
             )
             
     outclaims_mem = outclaims.join(
                     member_months,
-                    on=(outclaims.member_id == member_months.member_id_mm)
+                    on=(outclaims.member_id == member_months.member_id)
                        & (outclaims.month == member_months.elig_month),
                     how = 'inner'
-            ).withColumn(
-                'died_in_hospital',
-                spark_funcs.when(
-                    (
-                        (spark_funcs.col('dischargestatus') == '20') &
-                        (spark_funcs.col('prm_line').startswith('I')) &
-                        (spark_funcs.col('prm_line') != 'I31')
-                    ),
-                    spark_funcs.lit('Y'),
-                ).otherwise(
-                    spark_funcs.lit('N')
-                )
             )
-    
-    died_in_hosp = outclaims_mem.select(
-                'member_id',
-                'died_in_hospital'
-            ).where(
-                'died_in_hospital = "Y"'
-            ).distinct()
-    
-    mem_death = dfs_input['members'].join(
-                died_in_hosp,
-                on='member_id',
-                how='inner'
-            )
-    
-    pac_case_summary = calc_pac_episode_flags(outclaims_mem)
-    
-    pac_flags_final = outclaims_mem.join(
-                pac_case_summary,
-                on='pac_caseadmitid',
-                how='left_outer'                
-            ).join(
-                mem_death,
-                on='member_id',
-                how='left_outer'
-            ).withColumn(
-                'pac_died_in_hospital_yn',
-                spark_funcs.when(
-                    spark_funcs.col('death_date') <= spark_funcs.col('pac_episode_end_date'),
-                    spark_funcs.lit('Y'),
-                ).otherwise(
-                    spark_funcs.lit('N')
-                )
-            )
-    
     
     hcc_risk_adj = read_sas_data(
             sparkapp,
@@ -723,7 +547,7 @@ def main() -> int:
            
     risk_adj_summary = calc_risk_adj(outclaims_mem, member_months, hcc_risk_adj)
     
-    pac_metrics = calc_pac_metrics(pac_flags_final)
+    discharges = calc_discharges(outclaims_mem)
     
     readmit = calc_readmits(outclaims_mem)
     
@@ -734,7 +558,7 @@ def main() -> int:
             ).union(
                 risk_adj_summary
             ).union(
-                pac_metrics
+                discharges
             ).union(
                 readmit
             )
