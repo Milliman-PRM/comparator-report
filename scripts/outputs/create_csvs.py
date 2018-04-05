@@ -81,7 +81,7 @@ def main() -> int:
                     ' ',
                     ''
                 )
-            )
+            ).coalesce(10)
     
     sparkapp.save_df(
             metrics_out,

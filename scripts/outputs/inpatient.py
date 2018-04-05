@@ -519,7 +519,7 @@ def main() -> int:
                 risk_adj_summary
             ).union(
                 readmit
-            )
+            ).coalesce(10)
         
     sparkapp.save_df(
             inpatient_metrics,

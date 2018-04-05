@@ -183,7 +183,7 @@ def calc_pac_metrics(
                 pac_rehab
             ).union(
                 pac_hh
-            )        
+            ).coalesce(10)        
                                  
     return pac_metrics    
 
