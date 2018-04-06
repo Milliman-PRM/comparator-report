@@ -144,87 +144,9 @@ def main() -> int:
                     ''
                 )
             )
-                    
-    costmodel_nonesrd = costmodel.where(
-                spark_funcs.col('elig_status') != 'ESRD'
-            ).select(
-                'name_client',
-                'time_period',
-                'prm_line',
-                'mcrm_line',
-                spark_funcs.lit('Non-ESRD').alias('elig_status'),
-                'prv_net_aco_yn',
-                'prm_discharges',
-                'prm_days',
-                'prm_util',
-                'prm_costs',
-                'prm_allowed',
-                'prm_paid',
-                'prm_coverage_type',
-            ).groupBy(
-                'name_client',
-                'time_period',
-                'prm_line',
-                'mcrm_line',
-                'elig_status',
-                'prv_net_aco_yn',
-                'prm_coverage_type',
-            ).agg(
-                spark_funcs.sum('prm_discharges').alias('prm_discharges'),
-                spark_funcs.sum('prm_days').alias('prm_days'),
-                spark_funcs.sum('prm_util').alias('prm_util'),
-                spark_funcs.sum('prm_costs').alias('prm_costs'),
-                spark_funcs.sum('prm_allowed').alias('prm_allowed'),
-                spark_funcs.sum('prm_paid').alias('prm_paid'),
-            ).select(
-                'name_client',
-                'time_period',
-                'prm_line',
-                'mcrm_line',
-                'elig_status',
-                'prv_net_aco_yn',
-                'prm_discharges',
-                'prm_days',
-                'prm_util',
-                'prm_costs',
-                'prm_allowed',
-                'prm_paid',
-                'prm_coverage_type',
-            ).withColumn(
-                'idx',
-                spark_funcs.regexp_replace(
-                    spark_funcs.concat(
-                        spark_funcs.col('name_client'),
-                        spark_funcs.lit('_'),
-                        spark_funcs.col('time_period'),
-                        spark_funcs.lit('_'),                    
-                        spark_funcs.col('elig_status'),
-                        spark_funcs.lit('_'),                    
-                        spark_funcs.when(
-                            spark_funcs.col('mcrm_line') == 'x99',
-                            spark_funcs.lit('oth'),
-                            ).otherwise(
-                                spark_funcs.col('prm_line')
-                            ),
-                        spark_funcs.lit('_'),                    
-                        spark_funcs.when(
-                            spark_funcs.col('mcrm_line') == 'x99',
-                            spark_funcs.lit('oth'),
-                            ).otherwise(
-                                spark_funcs.col('mcrm_line')
-                            )
-                    ),
-                    ' ',
-                    ''
-                )
-            )
-                        
-    costmodel_out = costmodel.union(
-                costmodel_nonesrd
-            )
             
     sparkapp.save_df(
-            costmodel_out,
+            costmodel,
             PATH_OUTPUTS / 'costmodel.parquet',
             )
 

@@ -168,7 +168,7 @@ def main() -> int:
                     readmits
                 ).union(
                     distinct_snfs
-                ).coalesce(10)
+                )
     
     sparkapp.save_df(
             snf_metrics,

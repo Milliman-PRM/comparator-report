@@ -114,7 +114,7 @@ def main() -> int:
                         risk_score
                     ).union(
                         all_costs
-                    ).coalesce(10)
+                    )
            
     sparkapp.save_df(
             basic_metrics,

@@ -238,7 +238,7 @@ def main() -> int:
                 urg_care
             ).union(
                 office_vis
-            ).coalesce(10)
+            )
        
     sparkapp.save_df(
             outpatient_metrics,
