@@ -32,6 +32,7 @@ def main() -> int:
     dfs_input = {
             path.stem: sparkapp.load_df(path)
             for path in [
+                    PATH_INPUTS / 'members.parquet',
                     PATH_OUTPUTS / 'member_months.parquet',
                     PATH_INPUTS / 'outclaims.parquet',
                     PATH_INPUTS / 'time_periods.parquet',
@@ -108,12 +109,37 @@ def main() -> int:
                     spark_funcs.sum('prm_costs').alias('metric_value')
                 )
     
+    mem_age = member_months.join(
+                dfs_input['members'],
+                on='member_id',
+                how='inner'
+            ).withColumn(
+                'age_month',
+                spark_funcs.datediff(
+                    spark_funcs.col('elig_month'),
+                    spark_funcs.col('dob')
+                ) / 365.25
+            )
+    
+    total_age = mem_age.select(
+                'elig_status',
+                spark_funcs.lit('total_age').alias('metric_id'),
+                'age_month',
+            ).groupBy(
+                'elig_status',
+                'metric_id',
+            ).agg(
+                spark_funcs.sum('age_month').alias('metric_value')
+            )
+    
     basic_metrics = cnt_assigned_mems.union(
                         memmos_sum
                     ).union(
                         risk_score
                     ).union(
                         all_costs
+                    ).union(
+                        total_age
                     ).coalesce(10)
            
     sparkapp.save_df(
