@@ -48,7 +48,7 @@ def main() -> int:
     member_months = dfs_input['member_months']
     
     cnt_assigned_mems = member_months.select(
-                    spark_funcs.lit('All').alias('elig_status'),
+                    'elig_status',
                     spark_funcs.lit('cnt_assigned_mems').alias('metric_id'),
                     'member_id',
                 ).groupBy(

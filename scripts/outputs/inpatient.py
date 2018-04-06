@@ -500,6 +500,20 @@ def main() -> int:
             sparkapp,
             PATH_RISKADJ / 'mcrm_hcc_calibrations.sas7bdat',
             )
+
+    snf_disch = outclaims_mem.where(
+                (spark_funcs.col('prm_line') != 'I31') &
+                (spark_funcs.col('dischargestatus') == '03')
+            ).select(
+                'elig_status',
+                spark_funcs.lit('disch_snf').alias('metric_id'),
+                'prm_admits'
+            ).groupBy(
+                'elig_status',
+                'metric_id',
+            ).agg(
+                spark_funcs.sum('prm_admits').alias('metric_value')
+            )
     
     pqi_summary = calc_pqi(outclaims_mem)
     
@@ -517,6 +531,8 @@ def main() -> int:
                 one_day_summary
             ).union(
                 risk_adj_summary
+            ).union(
+                snf_disch
             ).union(
                 readmit
             ).coalesce(10)

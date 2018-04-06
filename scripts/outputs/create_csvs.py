@@ -111,22 +111,6 @@ def main() -> int:
         single_file=True,
     )
     
-    export_csv(
-        dfs_input['costmodel'],
-        PATH_OUTPUTS / 'cm_exp.txt',
-        sep='|',
-        header=True,
-        single_file=True,
-    )
-    
-    export_csv(
-        dfs_input['mem_out'],
-        PATH_OUTPUTS / 'mem.txt',
-        sep='|',
-        header=True,
-        single_file=True,
-    )
-
     return 0
 
 if __name__ == '__main__':
