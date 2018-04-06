@@ -252,63 +252,6 @@ class BasicMetrics(PRMPythonTask): # pragma: no cover
         )
         # pylint: enable=arguments-differ
 
-
-class CostModel(PRMPythonTask): # pragma: no cover
-    """Run costmodel.py"""
-
-    requirements = RequirementsContainer(
-        Members,
-    )
-
-    def output(self):
-        names_output = {
-            'costmodel.parquet',
-        }
-        return [
-            IndyPyLocalTarget(META_SHARED['path_data_comparator_report'] / NAME_MODULE / name)
-            for name in names_output
-        ]
-
-    def run(self):  # pylint: disable=arguments-differ
-        """Run the Luigi job"""
-        program = PATH_SCRIPTS / NAME_MODULE / "costmodel.py"
-        super().run(
-            program,
-            path_log=build_logfile_name(
-                program,
-                META_SHARED['path_logs_comparator_report'] / NAME_MODULE
-            )
-        )
-        # pylint: enable=arguments-differ
-
-class MemOut(PRMPythonTask): # pragma: no cover
-    """Run mem_out.py"""
-
-    requirements = RequirementsContainer(
-        Members,
-    )
-
-    def output(self):
-        names_output = {
-            'mem_out.parquet',
-        }
-        return [
-            IndyPyLocalTarget(META_SHARED['path_data_comparator_report'] / NAME_MODULE / name)
-            for name in names_output
-        ]
-
-    def run(self):  # pylint: disable=arguments-differ
-        """Run the Luigi job"""
-        program = PATH_SCRIPTS / NAME_MODULE / "mem_out.py"
-        super().run(
-            program,
-            path_log=build_logfile_name(
-                program,
-                META_SHARED['path_logs_comparator_report'] / NAME_MODULE
-            )
-        )
-        # pylint: enable=arguments-differ
-
 class CreateCSVs(PRMPythonTask): # pragma: no cover
     """Run create_csvs.py"""
 
