@@ -180,7 +180,7 @@ def main() -> int:
                     nonemergent
                 ).union(
                     unclassified
-                )
+                ).coalesce(10)
                     
     sparkapp.save_df(
             er_metrics,

@@ -125,10 +125,97 @@ def main() -> int:
                     ' ',
                     ''
                 )
-            )              
-
+            )
+    
+    mem_nonesrd = mem_out.where(
+                spark_funcs.col('elig_status') != 'ESRD'
+            ).select(
+                'name_client',
+                'time_period',
+                spark_funcs.lit('Non-ESRD').alias('elig_status'),
+                'deceased_yn',
+                'deceased_hospital_yn',
+                'age_avg',
+                'endoflife_numer_yn_chemolt14days',
+                'endoflife_denom_yn_chemolt14days',
+                'endoflife_numer_yn_hospicelt3day',
+                'endoflife_denom_yn_hospicelt3day',
+                'endoflife_numer_yn_hospicenever',
+                'endoflife_denom_yn_hospicenever',
+                'final_hospice_days',
+                'costs_final_30_days_sum',
+                'risk_score_type',
+                'riskscr_avg',
+                'riskscr_wgt',
+                'riskscr_cred',
+                'memcnt',
+                'total_age',
+            ).groupBy(
+                'name_client',
+                'time_period',
+                'elig_status',
+                'deceased_yn',
+                'deceased_hospital_yn',
+                'age_avg',
+                'endoflife_numer_yn_chemolt14days',
+                'endoflife_denom_yn_chemolt14days',
+                'endoflife_numer_yn_hospicelt3day',
+                'endoflife_denom_yn_hospicelt3day',
+                'endoflife_numer_yn_hospicenever',
+                'endoflife_denom_yn_hospicenever',
+                'final_hospice_days',
+                'costs_final_30_days_sum',
+                'risk_score_type',
+                'riskscr_avg',
+                'riskscr_cred',
+            ).agg(
+                spark_funcs.sum('riskscr_wgt').alias('riskscr_wgt'),
+                spark_funcs.sum('memcnt').alias('memcnt'),
+                spark_funcs.sum('total_age').alias('total_age'),
+            ).withColumn(
+                'idx',
+                spark_funcs.regexp_replace(
+                    spark_funcs.concat(
+                        spark_funcs.col('name_client'),
+                        spark_funcs.lit('_'),
+                        spark_funcs.col('time_period'),
+                        spark_funcs.lit('_'),
+                        spark_funcs.col('elig_status')
+                    ),
+                    ' ',
+                    ''
+                )
+            ).select(
+                'name_client',
+                'time_period',
+                'elig_status',
+                'deceased_yn',
+                'deceased_hospital_yn',
+                'age_avg',
+                'endoflife_numer_yn_chemolt14days',
+                'endoflife_denom_yn_chemolt14days',
+                'endoflife_numer_yn_hospicelt3day',
+                'endoflife_denom_yn_hospicelt3day',
+                'endoflife_numer_yn_hospicenever',
+                'endoflife_denom_yn_hospicenever',
+                'final_hospice_days',
+                'costs_final_30_days_sum',
+                'risk_score_type',
+                'riskscr_avg',
+                'riskscr_wgt',
+                'riskscr_cred',
+                'memcnt',
+                'total_age',
+                'idx',
+            )
+    
+    
+    mem_final = mem_out.union(
+            mem_nonesrd
+        ).coalesce(10)
+    
     sparkapp.save_df(
-            mem_out,
+            mem_final,
             PATH_OUTPUTS / 'mem_out.parquet',
             )
 

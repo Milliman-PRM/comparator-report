@@ -388,45 +388,7 @@ def calc_risk_adj(
             )
     
     return type_union
-            
-def calc_discharges(
-       outclaims: "DataFrame"
-       ) -> "DataFrame":
-        
-    outclaims_disch = outclaims.where(
-            spark_funcs.col('prm_line') != 'I31'
-            )
-    
-    discharges = outclaims_disch.select(
-            'elig_status',
-            spark_funcs.when(
-                spark_funcs.col('dischargestatus') == '01',
-                spark_funcs.lit('discharge_to_home'),
-            ).when(
-                spark_funcs.col('dischargestatus') == '03',
-                spark_funcs.lit('discharge_to_snf'),
-            ).when(
-                spark_funcs.col('dischargestatus') == '06',
-                spark_funcs.lit('discharge_to_home_health')
-            ).when(
-                spark_funcs.col('dischargestatus') == '20',
-                spark_funcs.lit('discharge_to_death')
-            ).when(
-                spark_funcs.col('dischargestatus') == '62',
-                spark_funcs.lit('discharge_to_irf')
-            ).otherwise(
-                spark_funcs.lit('discharge_to_other'),
-            ).alias('metric_id'),
-            'prm_admits',
-        ).groupBy(
-            'elig_status',
-            'metric_id',
-        ).agg(
-            spark_funcs.sum('prm_admits').alias('metric_value')
-        )
-                                
-    return discharges
-    
+                
 def calc_readmits(
        outclaims: "DataFrame"
        ) -> "DataFrame":
@@ -546,9 +508,7 @@ def main() -> int:
     one_day_summary = calc_one_day(outclaims_mem)
            
     risk_adj_summary = calc_risk_adj(outclaims_mem, member_months, hcc_risk_adj)
-    
-    discharges = calc_discharges(outclaims_mem)
-    
+       
     readmit = calc_readmits(outclaims_mem)
     
     inpatient_metrics = pqi_summary.union(
@@ -558,10 +518,8 @@ def main() -> int:
             ).union(
                 risk_adj_summary
             ).union(
-                discharges
-            ).union(
                 readmit
-            )
+            ).coalesce(10)
         
     sparkapp.save_df(
             inpatient_metrics,

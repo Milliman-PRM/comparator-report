@@ -223,7 +223,7 @@ def main() -> int:
                 hosp_lt3
             ).union(
                 cnt_chemo
-            )
+            ).coalesce(10)
     
     sparkapp.save_df(
             eol_metrics,

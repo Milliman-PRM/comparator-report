@@ -54,9 +54,26 @@ def main() -> int:
                 dfs_input['snf_metrics']
             ).union(
                 dfs_input['er_metrics']
+            ).union(
+                dfs_input['pac_metrics']
             )
     
-    metrics_out = metrics_stack.select(
+    nonesrd_metrics = metrics_stack.where(
+                spark_funcs.col('elig_status') != 'ESRD'
+            ).select(
+                spark_funcs.lit('Non-ESRD').alias('elig_status'),
+                'metric_id',
+                'metric_value',
+            ).groupBy(
+                'elig_status',
+                'metric_id',
+            ).agg(
+                spark_funcs.sum('metric_value').alias('metric_value')
+            )
+    
+    metrics_out = metrics_stack.union(
+                nonesrd_metrics
+            ).select(
                 spark_funcs.lit(META_SHARED['name_client']).alias('name_client'),
                 spark_funcs.lit(time_period).alias('time_period'),
                 'elig_status',
@@ -79,11 +96,11 @@ def main() -> int:
                     ' ',
                     ''
                 )
-            )
+            ).coalesce(10)
     
     sparkapp.save_df(
             metrics_out,
-            PATH_INPUTS / 'metrics.parquet',
+            PATH_OUTPUTS / 'metrics.parquet',
             )
     
     export_csv(
