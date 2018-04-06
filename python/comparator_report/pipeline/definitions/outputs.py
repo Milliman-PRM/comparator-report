@@ -256,8 +256,6 @@ class CreateCSVs(PRMPythonTask): # pragma: no cover
     """Run create_csvs.py"""
 
     requirements = RequirementsContainer(
-        CostModel,
-        MemOut,
         BasicMetrics,
         EOL,
         Inpatient,
