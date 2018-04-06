@@ -90,6 +90,7 @@ class PAC(PRMPythonTask): # pragma: no cover
     def output(self):
         names_output = {
             'pac_metrics.parquet',
+            'pac_drg_summary.parquet',
         }
         return [
             IndyPyLocalTarget(META_SHARED['path_data_comparator_report'] / NAME_MODULE / name)
@@ -298,6 +299,9 @@ class CreateCSVs(PRMPythonTask): # pragma: no cover
     def output(self):
         names_output = {
             'metrics.csv',
+            'metrics.txt',
+            'pac_drg_summary.txt',
+
         }
         return [
             IndyPyLocalTarget(META_SHARED['path_data_comparator_report'] / NAME_MODULE / name)

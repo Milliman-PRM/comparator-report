@@ -289,10 +289,71 @@ def main() -> int:
                 
     pac_metrics = calc_pac_metrics(pac_flags_trim)
     
+    pac_drg_summary = pac_flags_trim.where(
+                'pac_index_yn = "Y"'
+            ).select(
+                'prm_drg',
+                'pac_index_yn',
+                'pac_has_ip_acute_yn',
+                'pac_has_ip_rehab_yn',
+                'pac_has_snf_yn',
+                'pac_has_hh_yn',
+                'pac_died_in_hospital_yn',
+            ).groupBy(
+                'prm_drg',
+            ).agg(
+                spark_funcs.count('pac_index_yn').alias('pac_count'),
+                spark_funcs.sum(
+                    spark_funcs.when(
+                        spark_funcs.col('pac_has_ip_acute_yn') == 'Y',
+                        spark_funcs.lit(1),
+                    ).otherwise(
+                        0
+                    )
+                ).alias('pac_acute_count'),
+                spark_funcs.sum(
+                    spark_funcs.when(
+                        spark_funcs.col('pac_has_ip_rehab_yn') == 'Y',
+                        spark_funcs.lit(1),
+                    ).otherwise(
+                        0
+                    )
+                ).alias('pac_rehab_count'),
+                spark_funcs.sum(
+                    spark_funcs.when(
+                        spark_funcs.col('pac_has_snf_yn') == 'Y',
+                        spark_funcs.lit(1),
+                    ).otherwise(
+                        0
+                    )
+                ).alias('pac_snf_count'),                    
+                spark_funcs.sum(
+                    spark_funcs.when(
+                        spark_funcs.col('pac_has_hh_yn') == 'Y',
+                        spark_funcs.lit(1),
+                    ).otherwise(
+                        0
+                    )
+                ).alias('pac_hh_count'),   
+                spark_funcs.sum(
+                    spark_funcs.when(
+                        spark_funcs.col('pac_died_in_hospital_yn') == 'Y',
+                        spark_funcs.lit(1),
+                    ).otherwise(
+                        0
+                    )
+                ).alias('pac_death_count')
+            )                    
+    
     sparkapp.save_df(
             pac_metrics,
             PATH_OUTPUTS / 'pac_metrics.parquet',
-            )
+        )
+    
+    sparkapp.save_df(
+            pac_drg_summary,
+            PATH_OUTPUTS / 'pac_drg_summary.parquet',
+        )
 
     return 0
 

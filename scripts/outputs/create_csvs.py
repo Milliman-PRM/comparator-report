@@ -113,6 +113,14 @@ def main() -> int:
         single_file=True,
     )
     
+    export_csv(
+        dfs_input['pac_drg_summary']
+        PATH_OUTPUTS / 'pac_drg_summary.txt',
+        sep='|',
+        header=True,
+        single_file=True,
+    )
+    
     return 0
 
 if __name__ == '__main__':
