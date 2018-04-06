@@ -165,28 +165,6 @@ def metric_calc_ov(
     
     return metric
 
-def mr_line_summary(
-        outclaims: "DataFrame",
-        prm_line: "String"
-    ) -> "DataFrame":
-    
-    outclaims_mrline = outclaims.where(
-            spark_funcs.col('prm_line').startswith(prm_line)
-        )
-    
-    mr_line_cost = outclaims_mrline.select(
-                'elig_status',
-                spark_funcs.lit(prm_line + '_cost').alias('metric_id'),
-                'prm_costs',
-            ).groupBy(
-                'elig_status',
-                'metric_id',
-            ).agg(
-                spark_funcs.sum('prm_costs').alias('metric_value')
-            )
-    
-    return mr_line_cost
-
 def main() -> int:
     sparkapp = SparkApp(META_SHARED['pipeline_signature'])
     
@@ -250,16 +228,6 @@ def main() -> int:
     urg_care = metric_calc(outclaims_mem, risk_score, hcc_risk_adj, 'P33', 'urgent_care_prof')
     office_vis = metric_calc_ov(outclaims_mem, risk_score, hcc_risk_adj, 'office_visits')
     
-    mr_lines= ['P32c', 'P32', 'O16', 'P34', 'P82b', 'P89', 'P99', 'P2', 'I2']
-    
-    for mr_line in mr_lines:
-        if mr_lines.index(mr_line) == 0:
-            mr_line_metrics = mr_line_summary(outclaims_mem, mr_line)
-        else:
-            mr_line_metrics = mr_line_metrics.union(
-                        mr_line_summary(outclaims_mem, mr_line)
-                    )
-            
     outpatient_metrics = hi_tec_img.union(
                 obs_stays
             ).union(
@@ -270,8 +238,6 @@ def main() -> int:
                 urg_care
             ).union(
                 office_vis
-            ).union(
-                mr_line_metrics
             ).coalesce(10)
        
     sparkapp.save_df(

@@ -56,6 +56,8 @@ def main() -> int:
                 dfs_input['er_metrics']
             ).union(
                 dfs_input['pac_metrics']
+            ).union(
+                dfs_input['mr_line_metrics']
             )
     
     nonesrd_metrics = metrics_stack.where(

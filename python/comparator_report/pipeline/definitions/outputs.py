@@ -253,11 +253,41 @@ class BasicMetrics(PRMPythonTask): # pragma: no cover
         )
         # pylint: enable=arguments-differ
 
+class MRLineMetrics(PRMPythonTask): # pragma: no cover
+    """Run basic.py"""
+
+    requirements = RequirementsContainer(
+        Members,
+    )
+
+    def output(self):
+        names_output = {
+            'mr_line_metrics.parquet',
+        }
+        return [
+            IndyPyLocalTarget(META_SHARED['path_data_comparator_report'] / NAME_MODULE / name)
+            for name in names_output
+        ]
+
+    def run(self):  # pylint: disable=arguments-differ
+        """Run the Luigi job"""
+        program = PATH_SCRIPTS / NAME_MODULE / "mr_line_metrics.py"
+        super().run(
+            program,
+            path_log=build_logfile_name(
+                program,
+                META_SHARED['path_logs_comparator_report'] / NAME_MODULE
+            )
+        )
+        # pylint: enable=arguments-differ
+        
+
 class CreateCSVs(PRMPythonTask): # pragma: no cover
     """Run create_csvs.py"""
 
     requirements = RequirementsContainer(
         BasicMetrics,
+        MRLineMetrics,
         EOL,
         Inpatient,
         PAC,
@@ -268,8 +298,10 @@ class CreateCSVs(PRMPythonTask): # pragma: no cover
 
     def output(self):
         names_output = {
+            'metrics.csv',
             'metrics.txt',
             'pac_drg_summary.txt',
+
         }
         return [
             IndyPyLocalTarget(META_SHARED['path_data_comparator_report'] / NAME_MODULE / name)
