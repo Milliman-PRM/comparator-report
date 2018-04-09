@@ -292,6 +292,7 @@ def main() -> int:
     pac_drg_summary = pac_flags_trim.where(
                 'pac_index_yn = "Y"'
             ).select(
+                'elig_status',
                 'prm_drg',
                 'pac_index_yn',
                 'pac_has_ip_acute_yn',
@@ -301,6 +302,7 @@ def main() -> int:
                 'pac_died_in_hospital_yn',
                 'prm_admits',
             ).groupBy(
+                'elig_status',
                 'prm_drg',
             ).agg(
                 spark_funcs.sum('prm_admits').alias('pac_count'),

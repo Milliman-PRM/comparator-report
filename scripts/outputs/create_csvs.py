@@ -99,6 +99,19 @@ def main() -> int:
                     ''
                 )
             ).coalesce(10)
+                    
+    pac_drg = dfs_input['pac_drg_summary'].select(
+                spark_funcs.lit(META_SHARED['name_client']).alias('name_client'),
+                spark_funcs.lit(time_period).alias('time_period'),
+                'elig_status',
+                'prm_drg',
+                'pac_count',
+                'pac_acute_count',
+                'pac_rehab_count',
+                'pac_snf_count',
+                'pac_hh_count',
+                'pac_death_count',
+            )
     
     sparkapp.save_df(
             metrics_out,
@@ -114,7 +127,7 @@ def main() -> int:
     )
     
     export_csv(
-        dfs_input['pac_drg_summary'],
+        pac_drg,
         PATH_OUTPUTS / 'pac_drg_summary.txt',
         sep='|',
         header=True,
