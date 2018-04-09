@@ -114,7 +114,7 @@ def main() -> int:
     )
     
     export_csv(
-        dfs_input['pac_drg_summary']
+        dfs_input['pac_drg_summary'],
         PATH_OUTPUTS / 'pac_drg_summary.txt',
         sep='|',
         header=True,
