@@ -299,14 +299,15 @@ def main() -> int:
                 'pac_has_snf_yn',
                 'pac_has_hh_yn',
                 'pac_died_in_hospital_yn',
+                'prm_admits',
             ).groupBy(
                 'prm_drg',
             ).agg(
-                spark_funcs.count('pac_index_yn').alias('pac_count'),
+                spark_funcs.sum('prm_admits').alias('pac_count'),
                 spark_funcs.sum(
                     spark_funcs.when(
                         spark_funcs.col('pac_has_ip_acute_yn') == 'Y',
-                        spark_funcs.lit(1),
+                        spark_funcs.col('prm_admits'),
                     ).otherwise(
                         0
                     )
@@ -314,7 +315,7 @@ def main() -> int:
                 spark_funcs.sum(
                     spark_funcs.when(
                         spark_funcs.col('pac_has_ip_rehab_yn') == 'Y',
-                        spark_funcs.lit(1),
+                        spark_funcs.col('prm_admits'),
                     ).otherwise(
                         0
                     )
@@ -322,7 +323,7 @@ def main() -> int:
                 spark_funcs.sum(
                     spark_funcs.when(
                         spark_funcs.col('pac_has_snf_yn') == 'Y',
-                        spark_funcs.lit(1),
+                        spark_funcs.col('prm_admits'),
                     ).otherwise(
                         0
                     )
@@ -330,7 +331,7 @@ def main() -> int:
                 spark_funcs.sum(
                     spark_funcs.when(
                         spark_funcs.col('pac_has_hh_yn') == 'Y',
-                        spark_funcs.lit(1),
+                        spark_funcs.col('prm_admits'),
                     ).otherwise(
                         0
                     )
@@ -338,7 +339,7 @@ def main() -> int:
                 spark_funcs.sum(
                     spark_funcs.when(
                         spark_funcs.col('pac_died_in_hospital_yn') == 'Y',
-                        spark_funcs.lit(1),
+                        spark_funcs.col('prm_admits'),
                     ).otherwise(
                         0
                     )
