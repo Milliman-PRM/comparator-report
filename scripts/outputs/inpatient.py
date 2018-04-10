@@ -470,7 +470,8 @@ def main() -> int:
          ('Laminectomy/Spinal Fusion', 'laminectomyspinalfusi'),
          ('Hysterectomy', 'hysterectomy'),
          ('CABG', 'cabg'),
-         ('Hip/Knee Replacement (DRG)', 'hipkneereplacementdrg')],
+         ('Hip/Knee Replacement (DRG)', 'hipkneereplacementdrg'),
+         ('Uterine & Adnexa (DRG)', 'uterineadnexadrg')],
         schema=['prm_pref_sensitive_category', 'metric_id']
     )
     
