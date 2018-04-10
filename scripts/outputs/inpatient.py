@@ -319,7 +319,9 @@ def calc_risk_adj(
             ).agg(
                 spark_funcs.sum('admits').alias('metric_value')
             ).union(
-                outclaims_util.select(
+                outclaims_util.where(
+                    spark_funcs.col('mcrm_line') == 'I11'
+                ).select(
                     'elig_status',
                     spark_funcs.lit('medical_riskadj').alias('metric_id'),
                     'admits_riskadj',
@@ -343,7 +345,9 @@ def calc_risk_adj(
             ).agg(
                 spark_funcs.sum('admits').alias('metric_value')
             ).union(
-                outclaims_util.select(
+                outclaims_util.where(
+                    spark_funcs.col('prm_line') == 'I11a'
+                ).select(
                     'elig_status',
                     spark_funcs.lit('medical_general_riskadj').alias('metric_id'),
                     'admits_riskadj',
@@ -367,7 +371,9 @@ def calc_risk_adj(
             ).agg(
                 spark_funcs.sum('admits').alias('metric_value')
             ).union(
-                outclaims_util.select(
+                outclaims_util.where(
+                    spark_funcs.col('mcrm_line') == 'I12'
+                ).select(
                     'elig_status',
                     spark_funcs.lit('surgical_riskadj').alias('metric_id'),
                     'admits_riskadj',
