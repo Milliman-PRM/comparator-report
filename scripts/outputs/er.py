@@ -156,7 +156,6 @@ def main() -> int:
     primary_care = nyu_measures(outclaims_mem, 'prm_nyu_emergent_primary_care', 'ED_emer_pricare')
     injury = nyu_measures(outclaims_mem, 'prm_nyu_injury', 'ED_injury')
     nonemergent = nyu_measures(outclaims_mem, 'prm_nyu_nonemergent', 'ED_nonemer')
-    unclassified = nyu_measures(outclaims_mem, 'prm_nyu_unclassified', 'ED_other')
        
     er_metrics = util.select(
                     'elig_status',
@@ -178,9 +177,7 @@ def main() -> int:
                     injury
                 ).union(
                     nonemergent
-                ).union(
-                    unclassified
-                )
+                ).coalesce(10)
                     
     sparkapp.save_df(
             er_metrics,

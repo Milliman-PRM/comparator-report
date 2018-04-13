@@ -18,6 +18,7 @@ META_SHARED = comparator_report.meta.project.gather_metadata()
 NAME_MODULE = 'outputs'
 PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
 PATH_RS = META_SHARED['path_data_nyhealth_shared'] / 'risk_scores'
+PATH_MEMTIME = META_SHARED[18, 'out']
 PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
 
 runout = 3
@@ -32,9 +33,11 @@ def main() -> int:
     dfs_input = {
             path.stem: sparkapp.load_df(path)
             for path in [
+                    PATH_INPUTS / 'members.parquet',
                     PATH_OUTPUTS / 'member_months.parquet',
                     PATH_INPUTS / 'outclaims.parquet',
                     PATH_INPUTS / 'time_periods.parquet',
+                    PATH_MEMTIME / 'client_member_time.parquet',
                     ]
             }
     
@@ -47,8 +50,25 @@ def main() -> int:
        
     member_months = dfs_input['member_months']
     
-    cnt_assigned_mems = member_months.select(
+    attrib_lives = dfs_input['client_member_time'].where(
+                (spark_funcs.col('date_start').between(
+                    min_incurred_date,
+                    max_incurred_date,
+                    )) &
+                (spark_funcs.col('assignment_indicator') == 'Y')
+                ).select(
                     spark_funcs.lit('All').alias('elig_status'),
+                    spark_funcs.lit('cnt_attrib_lives').alias('metric_id'),
+                    'member_id',
+                ).groupBy(
+                    'elig_status',
+                    'metric_id',
+                ).agg(
+                    spark_funcs.countDistinct('member_id')
+                )
+                
+    cnt_assigned_mems = member_months.select(
+                    'elig_status',
                     spark_funcs.lit('cnt_assigned_mems').alias('metric_id'),
                     'member_id',
                 ).groupBy(
@@ -108,13 +128,40 @@ def main() -> int:
                     spark_funcs.sum('prm_costs').alias('metric_value')
                 )
     
+    mem_age = member_months.join(
+                dfs_input['members'],
+                on='member_id',
+                how='inner'
+            ).withColumn(
+                'age_month',
+                spark_funcs.datediff(
+                    spark_funcs.col('elig_month'),
+                    spark_funcs.col('dob')
+                ) / 365.25
+            )
+    
+    total_age = mem_age.select(
+                'elig_status',
+                spark_funcs.lit('total_age').alias('metric_id'),
+                'age_month',
+            ).groupBy(
+                'elig_status',
+                'metric_id',
+            ).agg(
+                spark_funcs.sum('age_month').alias('metric_value')
+            )
+    
     basic_metrics = cnt_assigned_mems.union(
                         memmos_sum
                     ).union(
                         risk_score
                     ).union(
                         all_costs
-                    )
+                    ).union(
+                        total_age
+                    ).union(
+                        attrib_lives
+                    ).coalesce(10)
            
     sparkapp.save_df(
             basic_metrics,
