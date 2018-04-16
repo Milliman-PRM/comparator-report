@@ -1,7 +1,7 @@
 """
 ### CODE OWNERS: Umang Gupta, Pierre Cornell
 ### OBJECTIVE:
-  Create Membership basis for all other queries
+  Calculate costs/util for each MR_Line used in comparator report
 ### DEVELOPER NOTES:
   None
 """

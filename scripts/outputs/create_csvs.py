@@ -1,7 +1,7 @@
 """
 ### CODE OWNERS: Umang Gupta, Pierre Cornell
 ### OBJECTIVE:
-  Create Membership basis for all other queries
+  Output all metrics and PAC DRG Summary to pipe delimited txt files. 
 ### DEVELOPER NOTES:
   None
 """
