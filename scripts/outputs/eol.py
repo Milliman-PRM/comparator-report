@@ -32,7 +32,9 @@ def calc_metrics(
         metric_id: "String"
     ) -> "DataFrame":
     
-    metric_val = members.select(
+    metric_val = members.where(
+                spark_funcs.col('death_flag') == 1
+            ).select(
                 'elig_status',
                 spark_funcs.lit(metric_name).alias('metric_id'),
                 spark_funcs.col(metric_id)
@@ -121,12 +123,12 @@ def main() -> int:
     claims_mem = mem_death.join(
                 dfs_input['outclaims'],
                 on='member_id',
-                how='left_outer',
+                how='inner',
             ).withColumn(
                 'lt_30_days',
                 spark_funcs.when(
                     spark_funcs.datediff(spark_funcs.col('death_date'),
-                                         spark_funcs.col('prm_fromdate')) <= 30,
+                                         spark_funcs.col('prm_todate')) <= 30,
                     spark_funcs.lit('Y')
                 ).otherwise(
                     spark_funcs.lit('N')
@@ -153,22 +155,6 @@ def main() -> int:
                 'member_id',
             ).agg(
                 spark_funcs.sum('prm_util').alias('hospice_days')
-            ).withColumn(
-                'hosp_never',
-                spark_funcs.when(
-                    spark_funcs.col('hospice_days') == 0,
-                    spark_funcs.lit(1)
-                ).otherwise(
-                    spark_funcs.lit(0)
-                )
-            ).withColumn(
-                'hosp_lt3',
-                spark_funcs.when(
-                    spark_funcs.col('hospice_days') < 3,
-                    spark_funcs.lit(1)
-                ).otherwise(
-                    spark_funcs.lit(0)
-                )
             )
 
     death_in_hosp = dfs_input['outclaims'].where(
@@ -200,6 +186,33 @@ def main() -> int:
                 ).otherwise(
                     spark_funcs.lit(1)
                 )
+            ).fillna({
+                'total_cost': 0.0,
+                'hospice_days': 0,
+            }).withColumn(
+                'hosp_never',
+                spark_funcs.when(
+                    spark_funcs.col('hospice_days') == 0,
+                    spark_funcs.lit(1)
+                ).otherwise(
+                    spark_funcs.lit(0)
+                )
+            ).withColumn(
+                'hosp_gt0',
+                spark_funcs.when(
+                    spark_funcs.col('hospice_days') > 0,
+                    spark_funcs.lit(1)
+                ).otherwise(
+                    spark_funcs.lit(0)
+                )
+            ).withColumn(
+                'hosp_lt3',
+                spark_funcs.when(
+                    spark_funcs.col('hospice_days').isin([1, 2]),
+                    spark_funcs.lit(1)
+                ).otherwise(
+                    spark_funcs.lit(0)
+                )
             )
 
     
@@ -208,6 +221,7 @@ def main() -> int:
     tot_cost = calc_metrics(mem_decor, 'tot_cost_final_30days', 'total_cost')
     death_hosp = calc_metrics(mem_decor, 'cnt_death_in_hosp', 'cnt_death_in_hosp')
     hosp_never = calc_metrics(mem_decor, 'cnt_hospice_never', 'hosp_never')
+    hosp_gt0 = calc_metrics(mem_decor, 'cnt_hospice_gt0days', 'hosp_gt0')
     hosp_lt3 = calc_metrics(mem_decor, 'cnt_hospice_lt3days', 'hosp_lt3')
     cnt_chemo = calc_metrics(mem_decor, 'cnt_chemo', 'cnt_chemo')
        
@@ -221,6 +235,8 @@ def main() -> int:
                 hosp_never
             ).union(
                 hosp_lt3
+            ).union(
+                hosp_gt0
             ).union(
                 cnt_chemo
             ).coalesce(10)
