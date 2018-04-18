@@ -1,7 +1,7 @@
 """
 ### CODE OWNERS: Umang Gupta, Pierre Cornell
 ### OBJECTIVE:
-  Create Membership basis for all other queries
+  Calculate PAC metrics and output PAC DRG Summary data table
 ### DEVELOPER NOTES:
   None
 """

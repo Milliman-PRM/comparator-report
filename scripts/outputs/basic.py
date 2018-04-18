@@ -1,7 +1,8 @@
 """
 ### CODE OWNERS: Umang Gupta, Pierre Cornell
 ### OBJECTIVE:
-  Create Membership basis for all other queries
+  Calculate basic metrics for members by eligibility status
+      (memmos, total costs, age, etc.)
 ### DEVELOPER NOTES:
   None
 """

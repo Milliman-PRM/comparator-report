@@ -1,8 +1,8 @@
 """
-### CODE OWNERS: Ben Copeland, Jason Altieri
+### CODE OWNERS: Umang Gupta, Pierre Cornell
 
 ### OBJECTIVE:
-  Prepare ACO insights for processing
+  Prepare Comparator Report for processing
 
 ### DEVELOPER NOTES:
   Uses shared metadata from PRM

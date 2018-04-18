@@ -1,7 +1,7 @@
 """
 ### CODE OWNERS: Umang Gupta, Pierre Cornell
 ### OBJECTIVE:
-  Create Membership basis for all other queries
+  Calculate ED metrics used in comparator report.
 ### DEVELOPER NOTES:
   None
 """
