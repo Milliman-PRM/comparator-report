@@ -144,12 +144,13 @@ def main() -> int:
     total_age = mem_age.select(
                 'elig_status',
                 spark_funcs.lit('total_age').alias('metric_id'),
+                'memmos',
                 'age_month',
             ).groupBy(
                 'elig_status',
                 'metric_id',
             ).agg(
-                spark_funcs.sum('age_month').alias('metric_value')
+                spark_funcs.sum(spark_funcs.col('memmos') * spark_funcs.col('age_month')).alias('metric_value'),
             )
     
     basic_metrics = cnt_assigned_mems.union(
