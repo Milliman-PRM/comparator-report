@@ -97,7 +97,6 @@ def main() -> int:
                 spark_funcs.col('elig_status_1').alias('elig_status'),
                 member_months.memmos,
                 'risk_score',
-                'cover_medical',
            )
        
     sparkapp.save_df(
