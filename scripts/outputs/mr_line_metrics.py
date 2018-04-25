@@ -96,7 +96,9 @@ def main() -> int:
                     spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
             ).collect()[0]
     
-    member_months = dfs_input['member_months']
+    member_months = dfs_input['member_months'].where(
+                spark_funcs.col('cover_medical') == 'Y'
+            )
         
     outclaims = dfs_input['outclaims'].where(
             spark_funcs.col('prm_fromdate').between(
