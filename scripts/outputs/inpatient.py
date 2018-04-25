@@ -453,9 +453,7 @@ def main() -> int:
                     spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
             ).collect()[0]
     
-    member_months = dfs_input['member_months'].where(
-                spark_funcs.col('cover_medical') == 'Y'
-            )
+    member_months = dfs_input['member_months']
     
     decor_limited = dfs_input['decor_case'].select(
             'member_id',

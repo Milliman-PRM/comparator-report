@@ -2,10 +2,6 @@
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
 
-### v1.1.0
-  - Require covered medical for membership when including claims in metric calculation
-  - Fix Total age calculation to multiply by memmos
-  
 ### v1.0.0
   - Calculate Metrics for Comparator Report
   - Align discharge metrics to PAC metrics instead of discharge status
