@@ -165,6 +165,52 @@ def metric_calc_ov(
     
     return metric
 
+def metric_calc_psp(
+        outclaims: "DataFrame",
+        ) -> "DataFrame":
+    
+    outclaims_psp = outclaims.where(
+            (~spark_funcs.col('psp_category').isNull()) &
+            (spark_funcs.col('prm_line').startswith('O12'))
+            )
+             
+    psp_gen = outclaims_psp.select(
+            'elig_status',
+            'prm_util',
+            ).groupBy(
+                'elig_status',
+            ).agg(
+                spark_funcs.sum('prm_util').alias('metric_value'),
+            )
+
+    psp_ind = outclaims_psp.select(
+            'elig_status',
+            spark_funcs.col('psp_category').alias('metric_id'),
+            'prm_util',
+            ).groupBy(
+                'elig_status',
+                'metric_id',
+            ).agg(
+                spark_funcs.sum('prm_util').alias('metric_value')
+            ).select(
+                'elig_status',
+                spark_funcs.concat(
+                    spark_funcs.lit('psp_procs_'),
+                    spark_funcs.col('metric_id'),
+                ).alias('metric_id'),
+                'metric_value',
+            )
+    
+    psps = psp_gen.select(
+            'elig_status',
+            spark_funcs.lit('psp_procs').alias('metric_id'),
+            'metric_value',
+            ).union(
+                psp_ind
+            )
+            
+    return psps
+
 def main() -> int:
     sparkapp = SparkApp(META_SHARED['pipeline_signature'])
     
@@ -205,7 +251,7 @@ def main() -> int:
                 date_as_month(spark_funcs.col('prm_fromdate'))
             ).where(
                 spark_funcs.col('prm_line').substr(1,3).isin(
-                    'O14', 'O10', 'P57', 'P59', 'P33', 'P32',
+                    'O14', 'O10', 'P57', 'P59', 'P33', 'P32', 'O12',
                     )
             )
             
@@ -227,6 +273,7 @@ def main() -> int:
     hi_tec_img_office = metric_calc(outclaims_mem, risk_score, hcc_risk_adj, 'P59', 'hi_tec_img_office')
     urg_care = metric_calc(outclaims_mem, risk_score, hcc_risk_adj, 'P33', 'urgent_care_prof')
     office_vis = metric_calc_ov(outclaims_mem, risk_score, hcc_risk_adj, 'office_visits')
+    pref_sens = metric_calc_psp(outclaims_mem)
     
     outpatient_metrics = hi_tec_img.union(
                 obs_stays
@@ -238,6 +285,8 @@ def main() -> int:
                 urg_care
             ).union(
                 office_vis
+            ).union(
+                pref_sens
             ).coalesce(10)
        
     sparkapp.save_df(

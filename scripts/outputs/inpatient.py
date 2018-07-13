@@ -73,17 +73,16 @@ def calc_pqi(
             
     return pqis
 
-def calc_psa(
+def calc_psp(
         outclaims: "DataFrame",
-        ref_psa: "DataFrame"
         ) -> "DataFrame":
     
-    outclaims_psa = outclaims.where(
-            (spark_funcs.col('prm_pref_sensitive_category') != 'Not PSA') &
+    outclaims_psp = outclaims.where(
+            (~spark_funcs.col('psp_category').isNull()) &
             (spark_funcs.col('prm_line') != 'I31')
             )
              
-    psa_gen = outclaims_psa.select(
+    psp_gen = outclaims_psp.select(
             'elig_status',
             'prm_admits',
             ).groupBy(
@@ -92,37 +91,33 @@ def calc_psa(
                 spark_funcs.sum('prm_admits').alias('metric_value'),
             )
 
-    psa_ind = outclaims_psa.select(
+    psp_ind = outclaims_psp.select(
             'elig_status',
-            'prm_pref_sensitive_category',
+            spark_funcs.col('psp_category').alias('metric_id'),
             'prm_admits',
             ).groupBy(
                 'elig_status',
-                'prm_pref_sensitive_category',
+                'metric_id',
             ).agg(
                 spark_funcs.sum('prm_admits').alias('metric_value')
-            ).join(
-                ref_psa,
-                on='prm_pref_sensitive_category',
-                how='left_outer',
             ).select(
                 'elig_status',
                 spark_funcs.concat(
-                    spark_funcs.lit('psa_admits_'),
+                    spark_funcs.lit('psp_admits_'),
                     spark_funcs.col('metric_id'),
                 ).alias('metric_id'),
                 'metric_value',
             )
     
-    psas = psa_gen.select(
+    psps = psp_gen.select(
             'elig_status',
-            spark_funcs.lit('pref_sens').alias('metric_id'),
+            spark_funcs.lit('psp_admits').alias('metric_id'),
             'metric_value',
             ).union(
-                psa_ind
+                psp_ind
             )
             
-    return psas
+    return psps
 
 def calc_one_day(
         outclaims: "DataFrame"
@@ -442,7 +437,6 @@ def main() -> int:
                     PATH_OUTPUTS / 'member_months.parquet',
                     PATH_INPUTS / 'time_periods.parquet',
                     PATH_INPUTS / 'outclaims.parquet',
-                    PATH_INPUTS / 'decor_case.parquet',
                     ]
             }
     
@@ -454,33 +448,7 @@ def main() -> int:
             ).collect()[0]
     
     member_months = dfs_input['member_months']
-    
-    decor_limited = dfs_input['decor_case'].select(
-            'member_id',
-            'caseadmitid',
-            *[
-                column
-                for column in dfs_input['decor_case'].columns
-                if column.startswith('prm_pref_')
-            ],
-            )
-    
-    ref_psa = sparkapp.session.createDataFrame(
-        [('Knee Replacement', 'kneereplacement'),
-         ('CABG/PTCA (DRG)', 'cabgptcadrg'),
-         ('TURP', 'turp'),
-         ('Bariatric Surgery', 'bariatricsurgery'),
-         ('TURP (DRG)', 'turpdrg'),
-         ('Hip Replacement', 'hipreplacement'),
-         ('PTCA', 'ptca'),
-         ('Laminectomy/Spinal Fusion', 'laminectomyspinalfusi'),
-         ('Hysterectomy', 'hysterectomy'),
-         ('CABG', 'cabg'),
-         ('Hip/Knee Replacement (DRG)', 'hipkneereplacementdrg'),
-         ('Uterine & Adnexa (DRG)', 'uterineadnexadrg')],
-        schema=['prm_pref_sensitive_category', 'metric_id']
-    )
-    
+       
     outclaims = dfs_input['outclaims'].where(
             spark_funcs.col('prm_fromdate').between(
                     min_incurred_date,
@@ -488,10 +456,6 @@ def main() -> int:
             ).withColumn(
                 'month',
                 date_as_month(spark_funcs.col('prm_fromdate'))
-            ).join(
-                decor_limited,
-                on=['member_id', 'caseadmitid'],
-                how='left_outer'
             ).where(
                 spark_funcs.col('prm_line').like('I%')
             )
@@ -524,7 +488,7 @@ def main() -> int:
     
     pqi_summary = calc_pqi(outclaims_mem)
     
-    psa_summary = calc_psa(outclaims_mem, ref_psa)
+    psp_summary = calc_psp(outclaims_mem)
     
     one_day_summary = calc_one_day(outclaims_mem)
            
@@ -533,7 +497,7 @@ def main() -> int:
     readmit = calc_readmits(outclaims_mem)
     
     inpatient_metrics = pqi_summary.union(
-            psa_summary
+            psp_summary
             ).union(
                 one_day_summary
             ).union(
