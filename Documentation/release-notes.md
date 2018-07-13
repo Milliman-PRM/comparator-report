@@ -1,6 +1,10 @@
 ## Release Notes
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
+### v1.1.0
+  - Update logic for preference sensitive admissions to preference sensitive procedures
+  - Pylinting Updates
+  
 ### v1.0.1
   - Update total age metric calculation to include memmos as weight
   
