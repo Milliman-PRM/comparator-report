@@ -80,7 +80,8 @@ def calc_psp(
     """Calculate Preference Sensitive Procedure Metrics"""
     outclaims_psp = outclaims.where(
         (~spark_funcs.col('psp_category').isNull()) &
-        (spark_funcs.col('prm_line') != 'I31')
+        (spark_funcs.col('prm_line') != 'I31') &
+        (spark_funcs.col('psp_preventable_yn') == 'Y')
     )
 
     psp_gen = outclaims_psp.select(
