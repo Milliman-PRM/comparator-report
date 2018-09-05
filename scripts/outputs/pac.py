@@ -173,6 +173,58 @@ def calc_pac_metrics(
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
     )
+    
+    snf_max_disch = outclaims.where(
+        (spark_funcs.col('pac_claim_yn') == 'Y') &
+        (spark_funcs.col('pac_major_category') == 'SNF')
+    ).select(
+        'pac_caseadmitid',
+        'prm_todate',
+    ).groupBy(
+        'pac_caseadmitid',
+    ).agg(
+        spark_funcs.max('prm_todate').alias('max_snf_disch')
+    )
+    
+    readmit_max_admit = outclaims.where(
+        (spark_funcs.col('pac_index_yn') == 'N') &
+        (spark_funcs.col('pac_claim_yn') == 'Y') &
+        (spark_funcs.col('pac_major_category') == 'IP') &
+        (spark_funcs.col('pac_minor_category') == 'Acute')
+    ).select(
+        'pac_caseadmitid',
+        'prm_fromdate',
+    ).groupBy(
+        'pac_caseadmitid',
+    ).agg(
+        spark_funcs.max('prm_fromdate').alias('max_readmit_admit')
+    )
+    
+    snf_readmit_30 = snf_max_disch.join(
+        readmit_max_admit,
+        on='pac_caseadmitid',
+        how='left_outer'
+    ).where(
+        (~spark_funcs.col('max_readmit_admit').isNull()) &
+        (spark_funcs.col('max_readmit_admit') >= spark_funcs.col('max_snf_disch'))
+    ).select(
+        'pac_caseadmitid'
+    ).distinct()
+    
+    pac_snf_readmits = outclaims_pac.join(
+        snf_readmit_30,
+        on='pac_caseadmitid',
+        how='inner',
+    ).select(
+        'elig_status',
+        spark_funcs.lit('pac_snf_readmit').alias('metric_id'),
+        'prm_admits',
+    ).groupBy(
+        'elig_status',
+        'metric_id',
+    ).agg(
+        spark_funcs.sum('prm_admits').alias('metric_value')
+    )
 
     pac_metrics = pac_count.union(
         pac_died
@@ -184,6 +236,8 @@ def calc_pac_metrics(
         pac_rehab
     ).union(
         pac_hh
+    ).union(
+        pac_snf_readmits
     ).coalesce(10)
 
     return pac_metrics
