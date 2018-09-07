@@ -152,6 +152,80 @@ def main() -> int:
         spark_funcs.countDistinct('providerid'),
     )
 
+    ip_readmits = dfs_input['outclaims'].where(
+        spark_funcs.col('prm_line_agg') == 'i1'
+    ).groupBy(
+        'member_id',
+        'caseadmitid',
+    ).agg(
+        spark_funcs.min('prm_fromdate_case').alias('readmit_start')
+    ).withColumn(
+        'window_start',
+        spark_funcs.date_add(
+            spark_funcs.col('readmit_start'),
+            -30,
+        )
+    ).withColumnRenamed(
+        'caseadmitid',
+        'caseadmitid_readmit'
+    )
+    
+    snf_max_disch = outclaims_mem.groupBy(
+        outclaims.member_id,
+        'caseadmitid'
+    ).agg(
+        spark_funcs.max('prm_fromdate_case').alias('snf_start_date')
+    )
+    
+    ip_max_disch = dfs_input['outclaims'].where(
+        spark_funcs.col('prm_line_agg') == 'i1'
+    ).groupBy(
+        'member_id',
+        'caseadmitid',
+    ).agg(
+        spark_funcs.max('prm_todate_case').alias('index_end')
+    ).withColumnRenamed(
+        'caseadmitid',
+        'caseadmitid_index',
+    )
+    
+    ip_readmits_w_snf = ip_readmits.join(
+        snf_max_disch,
+        on='member_id',
+        how='inner'
+    ).join(
+        ip_max_disch,
+        on='member_id',
+        how='inner',
+    ).where(
+        spark_funcs.col('snf_start_date').between(
+            spark_funcs.col('window_start'),
+            spark_funcs.col('readmit_start'),
+        )
+    ).where(
+        spark_funcs.col('index_end').between(
+            spark_funcs.col('window_start'),
+            spark_funcs.col('snf_start_date'),
+        )
+    ).select(
+        'caseadmitid'
+    ).distinct()
+        
+    snf_readmits = outclaims_mem.join(
+        ip_readmits_w_snf,
+        on='caseadmitid',
+        how='inner',
+    ).select(
+        'elig_status',
+        spark_funcs.lit('SNF_Readmits').alias('metric_id'),
+        'prm_admits',
+    ).groupBy(
+        'elig_status',
+        'metric_id',
+    ).agg(
+        spark_funcs.sum('prm_admits').alias('metric_value')
+    )
+            
     snf_metrics = admits.select(
         'elig_status',
         'metric_id',
@@ -168,6 +242,8 @@ def main() -> int:
         readmits
     ).union(
         distinct_snfs
+    ).union(
+        snf_readmits
     ).coalesce(10)
 
     sparkapp.save_df(
