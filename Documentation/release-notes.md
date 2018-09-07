@@ -1,6 +1,9 @@
 ## Release Notes
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
+### v1.2.0
+  - Add logic to calculate SNF Readmission rate
+  
 ### v1.1.0
   - Update logic for preference sensitive admissions to preference sensitive procedures
   - Pylinting Updates
@@ -15,7 +18,6 @@ A non-exhaustive list of what has changed in a more readable form than a commit 
   - Output metrics to pipe-delimited text files
   
 ### v0.1.0
-
   - Initial release of product component
     - Created python library and metadata structure
     - Added script to assist with promoting new releases
