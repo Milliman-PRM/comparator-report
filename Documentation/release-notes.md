@@ -1,6 +1,9 @@
 ## Release Notes
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
+### v1.3.0
+  - Update MR_LINEs to match E&U Report
+  
 ### v1.2.0
   - Add logic to calculate SNF Readmission rate
   
