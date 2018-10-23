@@ -86,7 +86,7 @@ def calc_all_mr_lines(
         'elig_status',
         spark_funcs.concat(
             spark_funcs.col('prm_line'),
-            spark_funcs.lit('_costs')
+            spark_funcs.lit('_cost')
         ).alias('metric_id'),
         'prm_costs',
     ).groupBy(
