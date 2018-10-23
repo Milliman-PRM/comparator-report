@@ -81,10 +81,13 @@ def mr_line_summary(
 def calc_all_mr_lines(
         outclaims: "DataFrame",
     ) -> "DataFrame":
-    
+    """Calculate admits, util, and costs for every individual mr_line"""
     mr_line_costs = outclaims.select(
         'elig_status',
-        spark_funcs.concat(spark_funcs.col('prm_line'), spark_funcs.lit('_costs')).alias('metric_id'),
+        spark_funcs.concat(
+            spark_funcs.col('prm_line'),
+            spark_funcs.lit('_costs')
+        ).alias('metric_id'),
         'prm_costs',
     ).groupBy(
         'elig_status',
@@ -92,35 +95,41 @@ def calc_all_mr_lines(
     ).agg(
         spark_funcs.sum('prm_costs').alias('metric_value')
     )
-    
+
     mr_line_admits = outclaims.select(
         'elig_status',
-        spark_funcs.concat(spark_funcs.col('prm_line'), spark_funcs.lit('_admits')).alias('metric_id'),
-        'prm_costs',
+        spark_funcs.concat(
+            spark_funcs.col('prm_line'),
+            spark_funcs.lit('_admits')
+        ).alias('metric_id'),
+        'prm_admits',
     ).groupBy(
         'elig_status',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
     ) 
-    
+
     mr_line_util = outclaims.select(
         'elig_status',
-        spark_funcs.concat(spark_funcs.col('prm_line'), spark_funcs.lit('_util')).alias('metric_id'),
-        'prm_costs',
+        spark_funcs.concat(
+            spark_funcs.col('prm_line'),
+            spark_funcs.lit('_util')
+        ).alias('metric_id'),
+        'prm_util',
     ).groupBy(
         'elig_status',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_util').alias('metric_value')
     ) 
-    
+
     all_mr_line_metrics = mr_line_costs.union(
         mr_line_admits
     ).union(
         mr_line_util
     )
-    
+
     return all_mr_line_metrics
 
 def main() -> int:
@@ -174,12 +183,12 @@ def main() -> int:
     
     all_mr_line_metrics = calc_all_mr_lines(outclaims_mem)
 
-    mr_line_metrics = mr_line_metrics.union(
+    mr_line_metrics_stack = mr_line_metrics.union(
         all_mr_line_metrics
     ).coalesce(15)
 
     sparkapp.save_df(
-        mr_line_metrics,
+        mr_line_metrics_stack,
         PATH_OUTPUTS / 'mr_line_metrics.parquet',
     )
 
