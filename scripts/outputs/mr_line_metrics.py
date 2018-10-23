@@ -32,7 +32,7 @@ def mr_line_summary(
         outclaims: "DataFrame",
         prm_line: "String"
     ) -> "DataFrame":
-    """Calculate a summary of costs and utilization by mr_line"""
+    """Calculate a summary of costs and utilization by mr_line combination"""
     outclaims_mrline = outclaims.where(
         spark_funcs.col('prm_line').startswith(prm_line)
     )
@@ -78,6 +78,51 @@ def mr_line_summary(
 
     return mr_metrics
 
+def calc_all_mr_lines(
+        outclaims: "DataFrame",
+    ) -> "DataFrame":
+    
+    mr_line_costs = outclaims.select(
+        'elig_status',
+        spark_funcs.concat(spark_funcs.col('prm_line'), spark_funcs.lit('_costs')).alias('metric_id'),
+        'prm_costs',
+    ).groupBy(
+        'elig_status',
+        'metric_id',
+    ).agg(
+        spark_funcs.sum('prm_costs').alias('metric_value')
+    )
+    
+    mr_line_admits = outclaims.select(
+        'elig_status',
+        spark_funcs.concat(spark_funcs.col('prm_line'), spark_funcs.lit('_admits')).alias('metric_id'),
+        'prm_costs',
+    ).groupBy(
+        'elig_status',
+        'metric_id',
+    ).agg(
+        spark_funcs.sum('prm_admits').alias('metric_value')
+    ) 
+    
+    mr_line_util = outclaims.select(
+        'elig_status',
+        spark_funcs.concat(spark_funcs.col('prm_line'), spark_funcs.lit('_util')).alias('metric_id'),
+        'prm_costs',
+    ).groupBy(
+        'elig_status',
+        'metric_id',
+    ).agg(
+        spark_funcs.sum('prm_util').alias('metric_value')
+    ) 
+    
+    all_mr_line_metrics = mr_line_costs.union(
+        mr_line_admits
+    ).union(
+        mr_line_util
+    )
+    
+    return all_mr_line_metrics
+
 def main() -> int:
     """Pass claims by mr_line to mr_line_summary to calculate metrics"""
     sparkapp = SparkApp(META_SHARED['pipeline_signature'])
@@ -117,17 +162,21 @@ def main() -> int:
         how='inner'
     )
 
-    mr_lines = ['I', 'I11', 'I11a', 'I11b', 'I11c', 'I12', 'I13', 'I14', 'I14a', 'I14b', 'I2', 'I31', 'Illb', 'Illc', 'O16', 'P2', 'P32', 'P32c', 'P32d', 'P34', 'P55b', 'P55c', 'P57a', 'P57b', 'P59a', 'P59b', 'P59d', 'P59e', 'P82a', 'P82b', 'P83', 'P84', 'P85', 'P89', 'P99',]
+    mr_lines_combo = ['I', 'I11', 'P32', 'O16', 'P34', 'P99', 'P2',]
 
-    for mr_line in mr_lines:
-        if mr_lines.index(mr_line) == 0:
+    for mr_line in mr_lines_combo:
+        if mr_lines_combo.index(mr_line) == 0:
             mr_line_metrics = mr_line_summary(outclaims_mem, mr_line)
         else:
             mr_line_metrics = mr_line_metrics.union(
                 mr_line_summary(outclaims_mem, mr_line)
             )
+    
+    all_mr_line_metrics = calc_all_mr_lines(outclaims_mem)
 
-    mr_line_metrics = mr_line_metrics.coalesce(10)
+    mr_line_metrics = mr_line_metrics.union(
+        all_mr_line_metrics
+    ).coalesce(15)
 
     sparkapp.save_df(
         mr_line_metrics,
