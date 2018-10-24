@@ -171,7 +171,7 @@ def main() -> int:
         how='inner'
     )
 
-    mr_lines_combo = ['I', 'I11', 'P32', 'O16', 'P34', 'P99', 'P2',]
+    mr_lines_combo = ['I', 'I11', 'P32', 'O16', 'P34', 'P99', 'P2', 'P',]
 
     for mr_line in mr_lines_combo:
         if mr_lines_combo.index(mr_line) == 0:
