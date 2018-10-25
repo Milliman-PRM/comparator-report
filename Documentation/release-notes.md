@@ -1,8 +1,11 @@
 ## Release Notes
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
+### v1.4.0
+  - Add util, costs, and admits for all prm_lines in addition to rolled up metrics previously shown.
+  
 ### v1.3.0
-  - Update MR_LINEs to match E&U Report
+  - Update prm_lines to match E&U Report
   
 ### v1.2.0
   - Add logic to calculate SNF Readmission rate
