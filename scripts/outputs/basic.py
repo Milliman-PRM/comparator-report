@@ -53,23 +53,6 @@ def main() -> int:
 
     member_months = dfs_input['member_months']
 
-    attrib_lives = dfs_input['client_member_time'].where(
-        (spark_funcs.col('date_start').between(
-            min_incurred_date,
-            max_incurred_date,
-        )) &
-        (spark_funcs.col('assignment_indicator') == 'Y')
-    ).select(
-        spark_funcs.lit('All').alias('elig_status'),
-        spark_funcs.lit('cnt_attrib_lives').alias('metric_id'),
-        'member_id',
-    ).groupBy(
-        'elig_status',
-        'metric_id',
-    ).agg(
-        spark_funcs.countDistinct('member_id')
-    )
-
     cnt_assigned_mems = member_months.select(
         'elig_status',
         spark_funcs.lit('cnt_assigned_mems').alias('metric_id'),
@@ -165,8 +148,6 @@ def main() -> int:
         all_costs
     ).union(
         total_age
-    ).union(
-        attrib_lives
     ).coalesce(10)
 
     sparkapp.save_df(
