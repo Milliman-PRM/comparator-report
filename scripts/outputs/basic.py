@@ -20,7 +20,6 @@ META_SHARED = comparator_report.meta.project.gather_metadata()
 NAME_MODULE = 'outputs'
 PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
 PATH_RS = META_SHARED['path_data_nyhealth_shared'] / 'risk_scores'
-PATH_MEMTIME = META_SHARED[18, 'out']
 PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
 
 RUNOUT = 3
@@ -40,7 +39,6 @@ def main() -> int:
             PATH_OUTPUTS / 'member_months.parquet',
             PATH_INPUTS / 'outclaims.parquet',
             PATH_INPUTS / 'time_periods.parquet',
-            PATH_MEMTIME / 'client_member_time.parquet',
         ]
     }
 
