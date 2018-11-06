@@ -20,7 +20,6 @@ META_SHARED = comparator_report.meta.project.gather_metadata()
 NAME_MODULE = 'outputs'
 PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
 PATH_RS = META_SHARED['path_data_nyhealth_shared'] / 'risk_scores'
-PATH_MEMTIME = META_SHARED[18, 'out']
 PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
 
 RUNOUT = 3
@@ -40,7 +39,6 @@ def main() -> int:
             PATH_OUTPUTS / 'member_months.parquet',
             PATH_INPUTS / 'outclaims.parquet',
             PATH_INPUTS / 'time_periods.parquet',
-            PATH_MEMTIME / 'client_member_time.parquet',
         ]
     }
 
@@ -52,23 +50,6 @@ def main() -> int:
     ).collect()[0]
 
     member_months = dfs_input['member_months']
-
-    attrib_lives = dfs_input['client_member_time'].where(
-        (spark_funcs.col('date_start').between(
-            min_incurred_date,
-            max_incurred_date,
-        )) &
-        (spark_funcs.col('assignment_indicator') == 'Y')
-    ).select(
-        spark_funcs.lit('All').alias('elig_status'),
-        spark_funcs.lit('cnt_attrib_lives').alias('metric_id'),
-        'member_id',
-    ).groupBy(
-        'elig_status',
-        'metric_id',
-    ).agg(
-        spark_funcs.countDistinct('member_id')
-    )
 
     cnt_assigned_mems = member_months.select(
         'elig_status',
@@ -165,8 +146,6 @@ def main() -> int:
         all_costs
     ).union(
         total_age
-    ).union(
-        attrib_lives
     ).coalesce(10)
 
     sparkapp.save_df(

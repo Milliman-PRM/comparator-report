@@ -36,7 +36,8 @@ def main() -> int:
         for path in [
             PATH_INPUTS / 'member_time_windows.parquet',
             PATH_INPUTS / 'time_periods.parquet',
-            PATH_RS / 'risk_scores.parquet'
+            PATH_INPUTS / 'members.parquet',
+            PATH_RS / 'risk_scores.parquet',
         ]
     }
 
@@ -52,8 +53,6 @@ def main() -> int:
             min_incurred_date,
             max_incurred_date,
         )
-    ).filter(
-        'assignment_indicator = "Y"'
     ).groupBy(
         'member_id',
         'elig_month',
@@ -73,8 +72,6 @@ def main() -> int:
             min_incurred_date,
             max_incurred_date,
         )
-    ).filter(
-        'assignment_indicator = "Y"'
     ).select(
         '*',
         spark_funcs.row_number().over(recent_info_window).alias('order'),
@@ -88,6 +85,12 @@ def main() -> int:
         how='inner'
     )
 
+    current_assigned = dfs_input['members'].filter(
+        spark_funcs.col('assignment_indicator') == 'Y'
+    ).select(
+        'member_id',
+    )
+
     member_join = member_months.join(
         recent_info,
         on=['member_id', 'elig_month'],
@@ -96,6 +99,10 @@ def main() -> int:
         risk_scores,
         on='member_id',
         how='left_outer'
+    ).join(
+        current_assigned,
+        on='member_id',
+        how='inner',
     ).select(
         'member_id',
         'elig_month',

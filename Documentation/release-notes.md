@@ -1,6 +1,9 @@
 ## Release Notes
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
+### v1.5.0
+  - Change metrics to be calculated off of Currently Assigned = 'Y' instead of Assigned During Selected Period = 'Y'
+  
 ### v1.4.0
   - Add util, costs, and admits for all prm_lines in addition to rolled up metrics previously shown.
   
