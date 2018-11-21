@@ -15,7 +15,7 @@ from indypy.nonstandard.ext_luigi import mutate_config
 import prm_ny_data_share.meta.project
 import comparator_report.meta.project
 
-from comparator_report.pipeline.definitions.outputs import CreateCSVs
+from comparator_report.pipeline.definitions.outputs import CreateCSVs, Members
 
 LOGGER = logging.getLogger(__name__)
 
@@ -34,6 +34,10 @@ def main() -> int:
     META_SHARED = comparator_report.meta.project.gather_metadata()
 
     mutate_config()
+
+    Members.kwargs_passthru = {
+        'YTD_Only': 'False',
+    }
 
     return int(not luigi.build([CreateCSVs(META_SHARED['pipeline_signature'])]))
 
