@@ -1,6 +1,9 @@
 ## Release Notes
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
+### v1.6.0
+  - Add an optional argument that allows the metrics to be calculated YTD instead of year rolling.
+  
 ### v1.5.0
   - Change metrics to be calculated off of Currently Assigned = 'Y' instead of Assigned During Selected Period = 'Y'
   
