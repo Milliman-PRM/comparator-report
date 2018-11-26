@@ -7,7 +7,9 @@
 """
 # pylint: disable=no-member
 import logging
+import os
 
+from datetime import date
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
 from pyspark.sql import Window
@@ -47,6 +49,13 @@ def main() -> int:
         spark_funcs.col('reporting_date_start').alias('min_incurred_date'),
         spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
     ).collect()[0]
+
+    if os.environ.get('YTD_Only', 'False').lower() == 'true':
+        min_incurred_date = date(
+            max_incurred_date.year,
+            1,
+            1
+        )
 
     member_months = dfs_input['member_time_windows'].filter(
         spark_funcs.col('elig_month').between(
