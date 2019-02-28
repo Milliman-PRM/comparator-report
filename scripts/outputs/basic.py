@@ -114,6 +114,46 @@ def main() -> int:
         spark_funcs.sum('prm_costs').alias('metric_value')
     )
 
+    trunc_costs = outclaims_mem.groupBy(
+        outclaims.member_id,
+        'elig_status',
+    ).agg(
+        spark_funcs.sum('memmos').alias('memmos'),
+        spark_funcs.sum('prm_costs').alias('costs'),
+    ).withColumn(
+        'truncation_threshold',
+        spark_funcs.when(
+            spark_funcs.col('elig_status') == 'Aged Non-Dual',
+            119631 * spark_funcs.col('memmos') / 12,
+        ).when(
+            spark_funcs.col('elig_status') == 'Aged Dual',
+            186528 * spark_funcs.col('memmos') / 12,
+        ).when(
+            spark_funcs.col('elig_status') == 'Disabled',
+            127739 * spark_funcs.col('memmos') / 12,
+        ).when(
+            spark_funcs.col('elig_status') == 'ESRD',
+            431369 * spark_funcs.col('memmos') / 12,
+        ).otherwise(
+            99999999
+        )
+    ).select(
+        'member_id',
+        'elig_status',
+        spark_funcs.lit('prm_costs_truncated').alias('metric_id'),
+        spark_funcs.when(
+            spark_funcs.col('costs') > spark_funcs.col('truncation_threshold'),
+            spark_funcs.col('truncation_threshold')
+        ).otherwise(
+            spark_funcs.col('costs')
+        ).alias('costs_truncated')
+    ).groupBy(
+        'elig_status',
+        'metric_id',
+    ).agg(
+        spark_funcs.sum('costs_truncated').alias('metric_value')
+    )    
+
     mem_age = member_months.join(
         dfs_input['members'],
         on='member_id',
@@ -144,6 +184,8 @@ def main() -> int:
         risk_score
     ).union(
         all_costs
+    ).union(
+        trunc_costs
     ).union(
         total_age
     ).coalesce(10)
