@@ -80,6 +80,7 @@ class Inpatient(PRMPythonTask): # pragma: no cover
         )
         # pylint: enable=arguments-differ
 
+
 class PAC(PRMPythonTask): # pragma: no cover
     """Run pac.py"""
 
@@ -108,6 +109,7 @@ class PAC(PRMPythonTask): # pragma: no cover
             )
         )
         # pylint: enable=arguments-differ
+
 
 class Outpatient(PRMPythonTask): # pragma: no cover
     """Run outpatient.py"""
@@ -253,8 +255,9 @@ class BasicMetrics(PRMPythonTask): # pragma: no cover
         )
         # pylint: enable=arguments-differ
 
+
 class MRLineMetrics(PRMPythonTask): # pragma: no cover
-    """Run basic.py"""
+    """Run mr_line_metrics.py"""
 
     requirements = RequirementsContainer(
         Members,
@@ -280,7 +283,36 @@ class MRLineMetrics(PRMPythonTask): # pragma: no cover
             )
         )
         # pylint: enable=arguments-differ
-        
+
+
+class Betos(PRMPythonTask): # pragma: no cover
+    """Run betos.py"""
+
+    requirements = RequirementsContainer(
+        Members,
+    )
+
+    def output(self):
+        names_output = {
+            'betos.parquet',
+        }
+        return [
+            IndyPyLocalTarget(META_SHARED['path_data_comparator_report'] / NAME_MODULE / name)
+            for name in names_output
+        ]
+
+    def run(self):  # pylint: disable=arguments-differ
+        """Run the Luigi job"""
+        program = PATH_SCRIPTS / NAME_MODULE / "betos.py"
+        super().run(
+            program,
+            path_log=build_logfile_name(
+                program,
+                META_SHARED['path_logs_comparator_report'] / NAME_MODULE
+            )
+        )
+        # pylint: enable=arguments-differ
+
 
 class CreateCSVs(PRMPythonTask): # pragma: no cover
     """Run create_csvs.py"""
@@ -294,13 +326,14 @@ class CreateCSVs(PRMPythonTask): # pragma: no cover
         Outpatient,
         ER,
         SNF,
+        Betos
     )
 
     def output(self):
         names_output = {
-            'metrics.csv',
             'metrics.txt',
             'pac_drg_summary.txt',
+            'betos_summary.txt',
 
         }
         return [
