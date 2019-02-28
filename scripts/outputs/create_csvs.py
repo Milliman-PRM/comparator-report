@@ -51,8 +51,6 @@ def main() -> int:
     ).union(
         dfs_input['outpatient_metrics']
     ).union(
-        dfs_input['eol_metrics']
-    ).union(
         dfs_input['snf_metrics']
     ).union(
         dfs_input['er_metrics']
@@ -77,6 +75,8 @@ def main() -> int:
 
     metrics_out = metrics_stack.union(
         nonesrd_metrics
+    ).union(
+        dfs_input['eol_metrics']
     ).select(
         spark_funcs.lit(META_SHARED['name_client']).alias('name_client'),
         spark_funcs.lit(time_period).alias('time_period'),
