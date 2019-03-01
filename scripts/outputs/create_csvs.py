@@ -115,6 +115,12 @@ def main() -> int:
         'pac_death_count',
     )
 
+    betos_summary = dfs_input['betos'].select(
+        spark_funcs.lit(META_SHARED['name_client']).alias('name_client'),
+        spark_funcs.lit(time_period).alias('time_period'),
+        '*',
+    )
+
     sparkapp.save_df(
         metrics_out,
         PATH_OUTPUTS / 'metrics.parquet',
@@ -135,6 +141,14 @@ def main() -> int:
         header=True,
         single_file=True,
     )
+
+    export_csv(
+        betos_summary,
+        PATH_OUTPUTS / 'betos_summary.txt',
+        sep='|',
+        header=True,
+        single_file=True,
+    )    
 
     return 0
 
