@@ -21,7 +21,7 @@ NAME_MODULE = 'outputs'
 PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
 PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
 RUNOUT = 3
-
+NONESRD = ['Aged Non-Dual', 'Aged Dual', 'Disabled']
 # =============================================================================
 # LIBRARIES, LOCATIONS, LITERALS, ETC. GO ABOVE HERE
 # =============================================================================
@@ -61,7 +61,7 @@ def main() -> int:
     )
 
     nonesrd_metrics = metrics_stack.where(
-        spark_funcs.col('elig_status') != 'ESRD'
+        spark_funcs.col('elig_status').isin(NONESRD)
     ).select(
         spark_funcs.lit('Non-ESRD').alias('elig_status'),
         'metric_id',
