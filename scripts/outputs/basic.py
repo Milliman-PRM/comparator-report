@@ -114,12 +114,22 @@ def main() -> int:
         spark_funcs.sum('prm_costs').alias('metric_value')
     )
 
+    memmos_summary = member_months.groupBy(
+        'member_id',
+        'elig_status',
+    ).agg(
+        spark_funcs.sum('memmos').alias('memmos')
+    )
+
     trunc_costs = outclaims_mem.groupBy(
         outclaims.member_id,
         'elig_status',
     ).agg(
-        spark_funcs.sum('memmos').alias('memmos'),
         spark_funcs.sum('prm_costs').alias('costs'),
+    ).join(
+        memmos_summary,
+        on=['member_id', 'elig_status'],
+        how='left_outer',
     ).withColumn(
         'truncation_threshold',
         spark_funcs.when(
