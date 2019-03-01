@@ -2,9 +2,13 @@
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
 ### v1.7.0
+  - Update calculation for following metrics to align with updated interface
+    - Pre-calculate Non-ESRD EOL metrics
+    - Update `prm_util` to `mr_procs` when calculating outpatient PSP metrics
+    - Remove member months with `Unknown` elig_status
   - Add Betos summary to outputs.
     - Summarize by Betos Code, PRM_line, and Elig_Status
-  
+
 ### v1.6.0
   - Add an optional argument that allows the metrics to be calculated YTD instead of year rolling.
   

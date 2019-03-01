@@ -70,9 +70,13 @@ def main() -> int:
 
     member_months = dfs_input['member_months']
 
-    mem_distinct = member_months.select(
+    mem_elig_distinct = member_months.select(
         'member_id',
         'elig_status',
+    ).distinct()
+
+    mem_distinct = member_months.select(
+        'member_id',
     ).distinct()
 
     mem_death = mem_distinct.join(
@@ -81,7 +85,6 @@ def main() -> int:
         how='left_outer',
     ).select(
         mem_distinct.member_id,
-        'elig_status',
         'death_date',
         spark_funcs.when(
             spark_funcs.col('death_date').between(
@@ -207,15 +210,58 @@ def main() -> int:
         ).otherwise(
             spark_funcs.lit(0)
         )
+    ).select(
+        'member_id',
+        'death_flag',
+        'cnt_cancer',
+        'total_cost',
+        'cnt_death_in_hosp',
+        'hosp_never',
+        'hosp_lt3',
+        'cnt_chemo'
     )
 
-    cnt_cancer = calc_metrics(mem_decor, 'cnt_cancer', 'cnt_cancer')
-    decedent_count = calc_metrics(mem_decor, 'decedent_count', 'death_flag')
-    tot_cost = calc_metrics(mem_decor, 'tot_cost_final_30days', 'total_cost')
-    death_hosp = calc_metrics(mem_decor, 'cnt_death_in_hosp', 'cnt_death_in_hosp')
-    hosp_never = calc_metrics(mem_decor, 'cnt_hospice_never', 'hosp_never')
-    hosp_lt3 = calc_metrics(mem_decor, 'cnt_hospice_lt3days', 'hosp_lt3')
-    cnt_chemo = calc_metrics(mem_decor, 'cnt_chemo', 'cnt_chemo')
+    mem_elig_death = mem_decor.join(
+        mem_elig_distinct,
+        on='member_id',
+        how='inner',
+    ).select(
+        'member_id',
+        'elig_status',
+        'death_flag',
+        'cnt_cancer',
+        'total_cost',
+        'cnt_death_in_hosp',
+        'hosp_never',
+        'hosp_lt3',
+        'cnt_chemo',
+    )
+
+    non_esrd_eol = mem_elig_death.where(
+        spark_funcs.col('elig_status') != 'ESRD'
+    ).select(
+        'member_id',
+        spark_funcs.lit('Non-ESRD').alias('elig_status'),
+        'death_flag',
+        'cnt_cancer',
+        'total_cost',
+        'cnt_death_in_hosp',
+        'hosp_never',
+        'hosp_lt3',
+        'cnt_chemo',
+    ).distinct()
+
+    mem_decor_stack = mem_elig_death.union(
+        non_esrd_eol
+    )
+
+    cnt_cancer = calc_metrics(mem_decor_stack, 'cnt_cancer', 'cnt_cancer')
+    decedent_count = calc_metrics(mem_decor_stack, 'decedent_count', 'death_flag')
+    tot_cost = calc_metrics(mem_decor_stack, 'tot_cost_final_30days', 'total_cost')
+    death_hosp = calc_metrics(mem_decor_stack, 'cnt_death_in_hosp', 'cnt_death_in_hosp')
+    hosp_never = calc_metrics(mem_decor_stack, 'cnt_hospice_never', 'hosp_never')
+    hosp_lt3 = calc_metrics(mem_decor_stack, 'cnt_hospice_lt3days', 'hosp_lt3')
+    cnt_chemo = calc_metrics(mem_decor_stack, 'cnt_chemo', 'cnt_chemo')
 
     eol_metrics = cnt_cancer.union(
         decedent_count
