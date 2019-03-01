@@ -58,10 +58,11 @@ def main() -> int:
         )
 
     member_months = dfs_input['member_time_windows'].filter(
-        spark_funcs.col('elig_month').between(
+        (spark_funcs.col('elig_month').between(
             min_incurred_date,
             max_incurred_date,
-        )
+        )) &
+        (spark_funcs.col('cover_medical') == 'Y')
     ).groupBy(
         'member_id',
         'elig_month',
