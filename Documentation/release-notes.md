@@ -2,7 +2,7 @@
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
 ### v1.7.0
-  - Add metric to calculated truncated dollars by rating category
+  - Add metric to calculated truncated dollars by elig status
 
 ### v1.6.0
   - Add an optional argument that allows the metrics to be calculated YTD instead of year rolling.
