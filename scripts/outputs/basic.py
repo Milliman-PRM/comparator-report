@@ -110,7 +110,7 @@ def main() -> int:
     )
 
     outclaims_mem = outclaims.join(
-        member_months,
+        member_months.where(spark_funcs.col('cover_medical') == 'Y'),
         on=(outclaims.member_id == member_months.member_id)
         & (outclaims.month == member_months.elig_month),
         how='inner'

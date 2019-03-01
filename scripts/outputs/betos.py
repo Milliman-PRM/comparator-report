@@ -51,7 +51,9 @@ def main() -> int:
 
     qexpu_runout_date = max_incurred_date + timedelta(days=5)
 
-    member_months = dfs_input['member_months']
+    member_months = dfs_input['member_months'].where(
+        spark_funcs.col('cover_medical') == 'Y'
+    )
 
     outclaims = dfs_input['outclaims'].where(
         spark_funcs.col('prm_fromdate').between(
