@@ -62,6 +62,19 @@ def main() -> int:
         spark_funcs.countDistinct('member_id').alias('metric_value')
     )
 
+    assigned_nonesrd = member_months.where(
+        spark_funcs.col('elig_status') != 'ESRD'
+    ).select(
+        spark_funcs.lit('Non-ESRD').alias('elig_status'),
+        spark_funcs.lit('cnt_assigned_mems_nonesrd').alias('metric_id'),
+        'member_id',
+    ).groupBy(
+        'elig_status',
+        'metric_id',
+    ).agg(
+        spark_funcs.countDistinct('member_id').alias('metric_value')
+    )
+
     memmos_sum = member_months.select(
         'elig_status',
         spark_funcs.lit('memmos_sum').alias('metric_id'),
@@ -189,6 +202,8 @@ def main() -> int:
     )
 
     basic_metrics = cnt_assigned_mems.union(
+        assigned_nonesrd
+    ).union(
         memmos_sum
     ).union(
         risk_score
