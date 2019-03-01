@@ -1,6 +1,10 @@
 ## Release Notes
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
+### v1.7.0
+  - Add Betos summary to outputs.
+    - Summarize by Betos Code, PRM_line, and Elig_Status
+  
 ### v1.6.0
   - Add an optional argument that allows the metrics to be calculated YTD instead of year rolling.
   
