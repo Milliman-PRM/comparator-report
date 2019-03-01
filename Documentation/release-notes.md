@@ -2,7 +2,8 @@
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
 ### v1.7.0
-  - Update calculation for following metrics to align with updated interface
+  - Add metric to calculate truncated dollars by elig status
+  - Update calculation for following metrics to align with interface changes
     - Pre-calculate Non-ESRD EOL metrics
     - Update `prm_util` to `mr_procs` when calculating outpatient PSP metrics
     - Remove member months with `Unknown` elig_status
