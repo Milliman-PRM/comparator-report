@@ -49,7 +49,7 @@ def main() -> int:
     ).collect()[0]
 
     member_months = dfs_input['member_months'].where(
-        spark_funcs.col('member_id') == 'Y'
+        spark_funcs.col('cover_medical') == 'Y'
     )
 
     risk_score = member_months.select(
