@@ -215,6 +215,9 @@ def main() -> int:
     )
 
     outclaims = dfs_input['outclaims'].withColumn(
+        'month',
+        date_as_month(spark_funcs.col('prm_fromdate'))
+    ).withColumn(
         'died_in_hospital',
         spark_funcs.when(
             (
@@ -264,10 +267,7 @@ def main() -> int:
     pac_flags_trim = pac_flags.join(
         member_months,
         on=(pac_flags.member_id == member_months.member_id)
-        & (pac_flags.prm_fromdate.between(
-             member_months.date_start,
-             member_months.date_end
-        )),
+        & (pac_flags.month == member_months.elig_month),
         how='inner'
     ).where(
         spark_funcs.col('prm_fromdate').between(

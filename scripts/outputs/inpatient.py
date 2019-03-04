@@ -461,6 +461,9 @@ def main() -> int:
             min_incurred_date,
             max_incurred_date,
         )
+    ).withColumn(
+        'month',
+        date_as_month(spark_funcs.col('prm_fromdate'))
     ).where(
         spark_funcs.col('prm_line').like('I%')
     )
@@ -468,10 +471,7 @@ def main() -> int:
     outclaims_mem = outclaims.join(
         member_months,
         on=(outclaims.member_id == member_months.member_id)
-        & (outclaims.prm_fromdate.between(
-             member_months.date_start,
-             member_months.date_end
-        )),
+        & (outclaims.month == member_months.elig_month),
         how='inner'
     )
 

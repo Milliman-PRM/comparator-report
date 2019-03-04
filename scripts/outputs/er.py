@@ -103,6 +103,9 @@ def main() -> int:
         decor_limited,
         on=['member_id', 'caseadmitid'],
         how='left_outer'
+    ).withColumn(
+        'month',
+        date_as_month(spark_funcs.col('prm_fromdate'))
     ).where(
         spark_funcs.col('prm_line').substr(1, 3) == 'O11'
     ).withColumn(
@@ -113,10 +116,7 @@ def main() -> int:
     outclaims_mem = outclaims.join(
         member_months,
         on=(outclaims.member_id == member_months.member_id)
-        & (outclaims.prm_fromdate.between(
-             member_months.date_start,
-             member_months.date_end
-        )),
+        & (outclaims.month == member_months.elig_month),
         how='inner'
     )
 
