@@ -61,9 +61,6 @@ def main() -> int:
             max_incurred_date,
         )
     ).withColumn(
-        'month',
-        date_as_month(spark_funcs.col('prm_fromdate'))
-    ).withColumn(
         'expu_runout_yn',
         spark_funcs.when(
             spark_funcs.col('paiddate') <= qexpu_runout_date,
@@ -76,7 +73,10 @@ def main() -> int:
     outclaims_mem = outclaims.join(
         member_months,
         on=(outclaims.member_id == member_months.member_id)
-        & (outclaims.month == member_months.elig_month),
+        & (outclaims.prm_fromdate.between(
+             member_months.date_start,
+             member_months.date_end
+        )),
         how='inner'
     )
 
