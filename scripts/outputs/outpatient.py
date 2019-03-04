@@ -178,22 +178,22 @@ def metric_calc_psp(
 
     psp_gen = outclaims_psp.select(
         'elig_status',
-        'prm_util',
+        'mr_procs',
     ).groupBy(
         'elig_status',
     ).agg(
-        spark_funcs.sum('prm_util').alias('metric_value'),
+        spark_funcs.sum('mr_procs').alias('metric_value'),
     )
 
     psp_ind = outclaims_psp.select(
         'elig_status',
         spark_funcs.col('psp_category').alias('metric_id'),
-        'prm_util',
+        'mr_procs',
     ).groupBy(
         'elig_status',
         'metric_id',
     ).agg(
-        spark_funcs.sum('prm_util').alias('metric_value')
+        spark_funcs.sum('mr_procs').alias('metric_value')
     ).select(
         'elig_status',
         spark_funcs.concat(
@@ -233,7 +233,9 @@ def main() -> int:
         spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
     ).collect()[0]
 
-    member_months = dfs_input['member_months']
+    member_months = dfs_input['member_months'].where(
+        spark_funcs.col('cover_medical') == 'Y'
+    )
 
     risk_score = member_months.select(
         'elig_status',

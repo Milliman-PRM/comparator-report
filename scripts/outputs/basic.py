@@ -62,6 +62,19 @@ def main() -> int:
         spark_funcs.countDistinct('member_id').alias('metric_value')
     )
 
+    assigned_nonesrd = member_months.where(
+        spark_funcs.col('elig_status') != 'ESRD'
+    ).select(
+        spark_funcs.lit('Non-ESRD').alias('elig_status'),
+        spark_funcs.lit('cnt_assigned_mems_nonesrd').alias('metric_id'),
+        'member_id',
+    ).groupBy(
+        'elig_status',
+        'metric_id',
+    ).agg(
+        spark_funcs.countDistinct('member_id').alias('metric_value')
+    )
+
     memmos_sum = member_months.select(
         'elig_status',
         spark_funcs.lit('memmos_sum').alias('metric_id'),
@@ -97,7 +110,7 @@ def main() -> int:
     )
 
     outclaims_mem = outclaims.join(
-        member_months,
+        member_months.where(spark_funcs.col('cover_medical') == 'Y'),
         on=(outclaims.member_id == member_months.member_id)
         & (outclaims.month == member_months.elig_month),
         how='inner'
@@ -113,6 +126,56 @@ def main() -> int:
     ).agg(
         spark_funcs.sum('prm_costs').alias('metric_value')
     )
+
+    memmos_summary = member_months.groupBy(
+        'member_id',
+        'elig_status',
+    ).agg(
+        spark_funcs.sum('memmos').alias('memmos')
+    )
+
+    trunc_costs = outclaims_mem.groupBy(
+        outclaims.member_id,
+        'elig_status',
+    ).agg(
+        spark_funcs.sum('prm_costs').alias('costs'),
+    ).join(
+        memmos_summary,
+        on=['member_id', 'elig_status'],
+        how='left_outer',
+    ).withColumn(
+        'truncation_threshold',
+        spark_funcs.when(
+            spark_funcs.col('elig_status') == 'Aged Non-Dual',
+            125790 * spark_funcs.col('memmos') / 12,
+        ).when(
+            spark_funcs.col('elig_status') == 'Aged Dual',
+            189563 * spark_funcs.col('memmos') / 12,
+        ).when(
+            spark_funcs.col('elig_status') == 'Disabled',
+            136466 * spark_funcs.col('memmos') / 12,
+        ).when(
+            spark_funcs.col('elig_status') == 'ESRD',
+            427506 * spark_funcs.col('memmos') / 12,
+        ).otherwise(
+            99999999
+        )
+    ).select(
+        'member_id',
+        'elig_status',
+        spark_funcs.lit('prm_costs_truncated').alias('metric_id'),
+        spark_funcs.when(
+            spark_funcs.col('costs') > spark_funcs.col('truncation_threshold'),
+            spark_funcs.col('truncation_threshold')
+        ).otherwise(
+            spark_funcs.col('costs')
+        ).alias('costs_truncated')
+    ).groupBy(
+        'elig_status',
+        'metric_id',
+    ).agg(
+        spark_funcs.sum('costs_truncated').alias('metric_value')
+    )    
 
     mem_age = member_months.join(
         dfs_input['members'],
@@ -139,11 +202,15 @@ def main() -> int:
     )
 
     basic_metrics = cnt_assigned_mems.union(
+        assigned_nonesrd
+    ).union(
         memmos_sum
     ).union(
         risk_score
     ).union(
         all_costs
+    ).union(
+        trunc_costs
     ).union(
         total_age
     ).coalesce(10)
