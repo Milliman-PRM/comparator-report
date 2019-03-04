@@ -118,6 +118,8 @@ def main() -> int:
         member_months.memmos,
         'risk_score',
         'cover_medical',
+        'date_start',
+        'date_end',
     ).where(
         spark_funcs.col('elig_status') != 'Unknown'
     )
