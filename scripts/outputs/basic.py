@@ -28,6 +28,65 @@ RUNOUT = 3
 # LIBRARIES, LOCATIONS, LITERALS, ETC. GO ABOVE HERE
 # =============================================================================
 
+def costs_summary(
+    outclaims: "DataFrame"
+    ) -> "DataFrame":
+    """Summarize Total, IME, DSH, and UCC costs by Elig Status"""
+    total_costs = outclaims.select(
+        'elig_status',
+        spark_funcs.lit('prm_costs_sum_all_services').alias('metric_id'),
+        'prm_costs',
+    ).groupBy(
+        'elig_status',
+        'metric_id',
+    ).agg(
+        spark_funcs.sum('prm_costs').alias('metric_value')
+    )
+
+    ime_costs = outclaims.select(
+        'elig_status',
+        spark_funcs.lit('ime_costs').alias('metric_id'),
+        (spark_funcs.col('prm_capital_ime_amount') + 
+         spark_funcs.col('prm_operational_ime_amount')).alias('ime_costs')
+    ).groupBy(
+        'elig_status',
+        'metric_id',
+    ).agg(
+        spark_funcs.sum('ime_costs').alias('metric_value')
+    )
+
+    dsh_costs = outclaims.select(
+        'elig_status',
+        spark_funcs.lit('dsh_costs').alias('metric_id'),
+        (spark_funcs.col('prm_capital_ds_amount') + 
+         spark_funcs.col('prm_operational_ds_amount')).alias('dsh_costs')
+    ).groupBy(
+        'elig_status',
+        'metric_id',
+    ).agg(
+        spark_funcs.sum('dsh_costs').alias('metric_value')
+    )
+
+    ucc_costs = outclaims.select(
+        'elig_status',
+        spark_funcs.lit('ucc_costs').alias('metric_id'),
+        'prm_hipps_dsh_amount',
+    ).groupBy(
+        'elig_status',
+        'metric_id',
+    ).agg(
+        spark_funcs.sum('prm_hipps_dsh_amount').alias('metric_value')
+    )
+
+    return total_costs.union(
+                ime_costs
+            ).union(
+                dsh_costs
+            ).union(
+                ucc_costs
+            )
+
+
 def main() -> int:
     """Calculate high level metrics by eligibility status"""
     sparkapp = SparkApp(META_SHARED['pipeline_signature'])
@@ -116,16 +175,7 @@ def main() -> int:
         how='inner'
     )
 
-    all_costs = outclaims_mem.select(
-        'elig_status',
-        spark_funcs.lit('prm_costs_sum_all_services').alias('metric_id'),
-        'prm_costs',
-    ).groupBy(
-        'elig_status',
-        'metric_id',
-    ).agg(
-        spark_funcs.sum('prm_costs').alias('metric_value')
-    )
+    costs_summary_stack = costs_summary(outclaims_mem)
 
     memmos_summary = member_months.groupBy(
         'member_id',
@@ -138,7 +188,14 @@ def main() -> int:
         outclaims.member_id,
         'elig_status',
     ).agg(
-        spark_funcs.sum('prm_costs').alias('costs'),
+        spark_funcs.sum(
+            spark_funcs.col('prm_costs') -
+            spark_funcs.col('prm_capital_ime_amount') -
+            spark_funcs.col('prm_operational_ime_amount') - 
+            spark_funcs.col('prm_capital_ds_amount') - 
+            spark_funcs.col('prm_operational_ds_amount') -
+            spark_funcs.col('prm_hipps_dsh_amount')
+        ).alias('costs'),
     ).join(
         memmos_summary,
         on=['member_id', 'elig_status'],
@@ -208,7 +265,7 @@ def main() -> int:
     ).union(
         risk_score
     ).union(
-        all_costs
+        costs_summary_stack
     ).union(
         trunc_costs
     ).union(
