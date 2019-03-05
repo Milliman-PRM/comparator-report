@@ -226,7 +226,9 @@ def calc_risk_adj(
         'elig_status',
     ).agg(
         spark_funcs.format_number((spark_funcs.sum(spark_funcs.col('memmos')*spark_funcs.col('risk_score')) / spark_funcs.sum(spark_funcs.col('memmos'))), 2).alias('risk_score_avg')
-    )
+    ).fillna({
+        'risk_score_avg': 0
+    })
 
     outclaims_admits = outclaims_ra.select(
         'elig_status',

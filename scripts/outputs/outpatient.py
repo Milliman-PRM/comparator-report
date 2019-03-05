@@ -245,7 +245,9 @@ def main() -> int:
         'elig_status',
     ).agg(
         spark_funcs.format_number((spark_funcs.sum(spark_funcs.col('memmos')*spark_funcs.col('risk_score')) / spark_funcs.sum(spark_funcs.col('memmos'))), 2).alias('risk_score_avg')
-    )
+    ).fillna({
+        'risk_score_avg': 0
+    })
 
     outclaims = dfs_input['outclaims'].where(
         spark_funcs.col('prm_fromdate').between(
