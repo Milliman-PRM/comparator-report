@@ -1,6 +1,9 @@
 ## Release Notes
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
+### v1.7.1
+  - Fill in NULL risk scores with 0 when aggregated by Eligibility Status to facilitate join to risk adjustment table
+
 ### v1.7.0
   - Add metric to calculate truncated dollars by elig status
   - Update calculation for following metrics to align with interface changes
