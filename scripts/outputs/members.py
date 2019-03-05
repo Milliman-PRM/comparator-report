@@ -20,7 +20,6 @@ META_SHARED = comparator_report.meta.project.gather_metadata()
 
 NAME_MODULE = 'outputs'
 PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
-PATH_RS = META_SHARED['path_data_nyhealth_shared'] / 'risk_scores'
 PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
 
 RUNOUT = 3
@@ -39,7 +38,7 @@ def main() -> int:
             PATH_INPUTS / 'member_time_windows.parquet',
             PATH_INPUTS / 'time_periods.parquet',
             PATH_INPUTS / 'members.parquet',
-            PATH_RS / 'risk_scores.parquet',
+            PATH_INPUTS / 'risk_scores.parquet',
         ]
     }
 
@@ -118,6 +117,7 @@ def main() -> int:
         spark_funcs.col('elig_status_1').alias('elig_status'),
         member_months.memmos,
         'risk_score',
+        'cover_medical',
     ).where(
         spark_funcs.col('elig_status') != 'Unknown'
     )
