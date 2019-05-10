@@ -37,6 +37,7 @@ def main() -> int:
 
     Members.kwargs_passthru = {
         'YTD_Only': 'False',
+        'Currently_Assigned_Enabled': 'False',
     }
 
     return int(not luigi.build([CreateCSVs(META_SHARED['pipeline_signature'])]))
