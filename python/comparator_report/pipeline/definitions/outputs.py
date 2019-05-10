@@ -313,6 +313,33 @@ class Betos(PRMPythonTask): # pragma: no cover
         )
         # pylint: enable=arguments-differ
 
+class Truncation(PRMPythonTask): # pragma: no cover
+    """Run truncation.py"""
+
+    requirements = RequirementsContainer(
+        Members,
+    )
+
+    def output(self):
+        names_output = {
+            'truncation.parquet',
+        }
+        return [
+            IndyPyLocalTarget(META_SHARED['path_data_comparator_report'] / NAME_MODULE / name)
+            for name in names_output
+        ]
+
+    def run(self):  # pylint: disable=arguments-differ
+        """Run the Luigi job"""
+        program = PATH_SCRIPTS / NAME_MODULE / "truncation.py"
+        super().run(
+            program,
+            path_log=build_logfile_name(
+                program,
+                META_SHARED['path_logs_comparator_report'] / NAME_MODULE
+            )
+        )
+        # pylint: enable=arguments-differ 
 
 class CreateCSVs(PRMPythonTask): # pragma: no cover
     """Run create_csvs.py"""
@@ -326,7 +353,8 @@ class CreateCSVs(PRMPythonTask): # pragma: no cover
         Outpatient,
         ER,
         SNF,
-        Betos
+        Betos,
+        Truncation
     )
 
     def output(self):
@@ -334,7 +362,7 @@ class CreateCSVs(PRMPythonTask): # pragma: no cover
             'metrics.txt',
             'pac_drg_summary.txt',
             'betos_summary.txt',
-
+            'truncation_summary.txt',
         }
         return [
             IndyPyLocalTarget(META_SHARED['path_data_comparator_report'] / NAME_MODULE / name)
