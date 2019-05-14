@@ -56,11 +56,19 @@ def main() -> int:
             1
         )
 
+    if os.environ.get('Currently_Assigned_Enabled', 'False').lower() == 'true':
+        memmos_filter = spark_funcs.col('elig_month').between(
+                            min_incurred_date,
+                            max_incurred_date,
+                        )  
+    else:
+        memmos_filter = (spark_funcs.col('elig_month').between(
+                            min_incurred_date,
+                            max_incurred_date
+                        )) & (spark_funcs.col('assignment_indicator') == 'Y')
+
     member_months = dfs_input['member_time_windows'].filter(
-        spark_funcs.col('elig_month').between(
-            min_incurred_date,
-            max_incurred_date,
-        )
+        memmos_filter
     ).groupBy(
         'member_id',
         'elig_month',
@@ -76,10 +84,7 @@ def main() -> int:
     )
 
     recent_info = dfs_input['member_time_windows'].filter(
-        spark_funcs.col('elig_month').between(
-            min_incurred_date,
-            max_incurred_date,
-        )
+        memmos_filter
     ).select(
         '*',
         spark_funcs.row_number().over(recent_info_window).alias('order'),
@@ -93,34 +98,55 @@ def main() -> int:
         how='inner'
     )
 
-    current_assigned = dfs_input['members'].filter(
-        spark_funcs.col('assignment_indicator') == 'Y'
-    ).select(
-        'member_id',
-    )
+    if os.environ.get('Currently_Assigned_Enabled', 'False').lower() == 'true':
+        current_assigned = dfs_input['members'].filter(
+            spark_funcs.col('assignment_indicator') == 'Y'
+        ).select(
+            'member_id',
+        )        
+        
+        member_join = member_months.join(
+            recent_info,
+            on=['member_id', 'elig_month'],
+            how='inner'
+        ).join(
+            risk_scores,
+            on='member_id',
+            how='left_outer'
+        ).join(
+            current_assigned,
+            on='member_id',
+            how='inner',
+        ).select(
+            'member_id',
+            'elig_month',
+            spark_funcs.col('elig_status_1').alias('elig_status'),
+            member_months.memmos,
+            'risk_score',
+            'cover_medical',
+        ).where(
+            spark_funcs.col('elig_status') != 'Unknown'
+        )
+    else:
+        member_join = member_months.join(
+            recent_info,
+            on=['member_id', 'elig_month'],
+            how='inner'
+        ).join(
+            risk_scores,
+            on='member_id',
+            how='left_outer'
+        ).select(
+            'member_id',
+            'elig_month',
+            spark_funcs.col('elig_status_1').alias('elig_status'),
+            member_months.memmos,
+            'risk_score',
+            'cover_medical',
+        ).where(
+            spark_funcs.col('elig_status') != 'Unknown'
+        )
 
-    member_join = member_months.join(
-        recent_info,
-        on=['member_id', 'elig_month'],
-        how='inner'
-    ).join(
-        risk_scores,
-        on='member_id',
-        how='left_outer'
-    ).join(
-        current_assigned,
-        on='member_id',
-        how='inner',
-    ).select(
-        'member_id',
-        'elig_month',
-        spark_funcs.col('elig_status_1').alias('elig_status'),
-        member_months.memmos,
-        'risk_score',
-        'cover_medical',
-    ).where(
-        spark_funcs.col('elig_status') != 'Unknown'
-    )
 
     sparkapp.save_df(
         member_join,

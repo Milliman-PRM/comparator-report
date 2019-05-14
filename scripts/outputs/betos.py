@@ -49,24 +49,67 @@ def main() -> int:
         spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
     ).collect()[0]
 
-    qexpu_runout_date = max_incurred_date + timedelta(days=5)
+    qexpu_runout_7 = max_incurred_date + timedelta(days=7)
+    qexpu_runout_14 = max_incurred_date + timedelta(days=14)
 
     member_months = dfs_input['member_months'].where(
         spark_funcs.col('cover_medical') == 'Y'
     )
 
     outclaims = dfs_input['outclaims'].where(
-        spark_funcs.col('prm_fromdate').between(
+        (spark_funcs.col('prm_fromdate').between(
             min_incurred_date,
             max_incurred_date,
-        )
+        )) |
+        (spark_funcs.col('prm_todate').between(
+            min_incurred_date,
+            max_incurred_date,
+        ))    
     ).withColumn(
         'month',
-        date_as_month(spark_funcs.col('prm_fromdate'))
-    ).withColumn(
-        'expu_runout_yn',
         spark_funcs.when(
-            spark_funcs.col('paiddate') <= qexpu_runout_date,
+            spark_funcs.col('prm_fromdate').between(
+                min_incurred_date,
+                max_incurred_date,
+            ),
+            date_as_month(spark_funcs.col('prm_fromdate')),
+        ).otherwise(
+            date_as_month(spark_funcs.col('prm_todate'))
+        )
+    ).withColumn(
+        'runout_7_yn',
+        spark_funcs.when(
+            spark_funcs.col('paiddate') <= qexpu_runout_7,
+            spark_funcs.lit('Y')
+        ).otherwise(
+            spark_funcs.lit('N')
+        )
+    ).withColumn(
+        'runout_14_yn',
+        spark_funcs.when(
+            spark_funcs.col('paiddate') <= qexpu_runout_14,
+            spark_funcs.lit('Y')
+        ).otherwise(
+            spark_funcs.lit('N')
+        )
+    ).withColumn(
+        'fromdate_elig_yn',
+        spark_funcs.when(
+            spark_funcs.col('prm_fromdate').between(
+                min_incurred_date,
+                max_incurred_date
+            ),
+            spark_funcs.lit('Y')
+        ).otherwise(
+            spark_funcs.lit('N')
+        )
+    ).withColumn(
+        'todate_elig_yn',
+        spark_funcs.when(
+            spark_funcs.col('prm_todate').between(
+                min_incurred_date,
+                max_incurred_date,
+            ),
             spark_funcs.lit('Y')
         ).otherwise(
             spark_funcs.lit('N')
@@ -83,7 +126,10 @@ def main() -> int:
     betos_summary = outclaims_mem.groupBy(
         'prm_betos_code',
         'prm_line',
-        'expu_runout_yn',
+        'runout_7_yn',
+        'runout_14_yn',
+        'fromdate_elig_yn',
+        'todate_elig_yn',
         'elig_status',
     ).agg(
         spark_funcs.sum('prm_costs').alias('costs')
