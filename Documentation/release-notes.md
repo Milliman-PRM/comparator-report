@@ -1,6 +1,11 @@
 ## Release Notes
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
+### v1.8.0
+  - Allow user to toggle between `Currently Assigned` and `Assigned During Selected Period`
+  - Export BETOS summary with varied runouts
+  - Export IME, DSH, UCC summary along with Truncated costs by Elig Status
+  
 ### v1.7.1
   - Fill in NULL risk scores with 0 when aggregated by Eligibility Status to facilitate join to risk adjustment table
 
