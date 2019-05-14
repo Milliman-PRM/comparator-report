@@ -121,6 +121,12 @@ def main() -> int:
         '*',
     )
 
+    truncation_summary = dfs_input['truncation'].select(
+        spark_funcs.lit(META_SHARED['name_client']).alias('name_client'),
+        spark_funcs.lit(time_period).alias('time_period'),
+        '*',
+    )
+
     sparkapp.save_df(
         metrics_out,
         PATH_OUTPUTS / 'metrics.parquet',
@@ -148,7 +154,15 @@ def main() -> int:
         sep='|',
         header=True,
         single_file=True,
-    )    
+    )
+
+    export_csv(
+        truncation_summary,
+        PATH_OUTPUTS / 'truncation_summary.txt',
+        sep='|',
+        header=True,
+        single_file=True,
+    )       
 
     return 0
 
