@@ -20,7 +20,7 @@ META_SHARED = comparator_report.meta.project.gather_metadata()
 NAME_MODULE = 'outputs'
 PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
 PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
-PATH_RISKADJ = META_SHARED[15, 'out']
+PATH_REF = META_SHARED[15, 'out']
 
 RUNOUT = 3
 
@@ -229,12 +229,12 @@ def calc_risk_adj(
     outclaims_admits = outclaims_ra.select(
         'elig_status',
         'prm_line',
-        'mcrm_line',
+        'btnumber',
         'prm_admits',
     ).groupBy(
         'elig_status',
         'prm_line',
-        'mcrm_line',
+        'btnumber',
     ).agg(
         spark_funcs.sum('prm_admits').alias('admits')
     ).join(
@@ -245,11 +245,11 @@ def calc_risk_adj(
 
     outclaims_util = outclaims_admits.join(
         hcc_risk_adj,
-        on='mcrm_line',
+        on='btnumber',
         how='left_outer',
     ).select(
         'elig_status',
-        'mcrm_line',
+        'btnumber',
         'prm_line',
         'admits',
         'risk_score_avg',
@@ -329,7 +329,7 @@ def calc_risk_adj(
     )
 
     surgery = outclaims_util.where(
-        spark_funcs.col('mcrm_line') == 'I12'
+        spark_funcs.col('prm_line') == 'I12'
     ).select(
         'elig_status',
         spark_funcs.lit('surgical').alias('metric_id'),
@@ -341,7 +341,7 @@ def calc_risk_adj(
         spark_funcs.sum('admits').alias('metric_value')
     ).union(
         outclaims_util.where(
-            spark_funcs.col('mcrm_line') == 'I12'
+            spark_funcs.col('prm_line') == 'I12'
         ).select(
             'elig_status',
             spark_funcs.lit('surgical_riskadj').alias('metric_id'),
@@ -412,12 +412,13 @@ def main() -> int:
             PATH_OUTPUTS / 'member_months.parquet',
             PATH_INPUTS / 'time_periods.parquet',
             PATH_INPUTS / 'outclaims.parquet',
-            PATH_INPUTS / 'ref_link_mcrm_line.parquet',
+            PATH_REF / 'ref_link_hcg_researcher_line.parquet',
+            PATH_REF / 'ref_hcg_bt.parquet',
         ]
     }
 
-    mcrm_map = dfs_input['ref_link_mcrm_line'].where(
-        spark_funcs.col('type_hcg') == 'Medicare'
+    mr_line_map = dfs_input['ref_link_hcg_researcher_line'].where(
+        spark_funcs.col('lob') == 'Medicare'
     )
 
     min_incurred_date, max_incurred_date = dfs_input['time_periods'].where(
@@ -449,16 +450,12 @@ def main() -> int:
         & (outclaims.month == member_months.elig_month),
         how='inner'
     ).join(
-        mcrm_map,
-        on='prm_line',
+        mr_line_map,
+        on=(outclaims.prm_line == mr_line_map.researcherline),
         how='left_outer',
     )
 
-    hcc_risk_adj = sparkapp.load_df(
-        PATH_RISKADJ / 'ref_hcg_bt.parquet'
-    )
-
-    hcc_risk_trim = hcc_risk_adj.where(
+    hcc_risk_trim = dfs_input['ref_hcg_bt'].where(
         (spark_funcs.col('lob') == 'Medicare')
         & (spark_funcs.col('basis') == 'RS')
     ).withColumn(
@@ -544,7 +541,7 @@ def main() -> int:
             spark_funcs.lit(500.0)
         )
     ).select(
-        spark_funcs.col('btnumber').alias('mcrm_line'),
+        'btnumber',
         'hcc_bot_round',
         'hcc_top_round',
         'admitfactor',
@@ -592,8 +589,6 @@ def main() -> int:
         inpatient_metrics,
         PATH_OUTPUTS / 'inpatient_metrics.parquet',
     )
-
-    hcc_risk_adj.unpersist()
 
     return 0
 
