@@ -100,7 +100,7 @@ def metric_calc_ov(
         metric_id: "String",
     ) -> "DataFrame":
     """Office Visit metric calculations"""
-    outclaims_mcrm = outclaims_mem.where(
+    outclaims_mcrm = outclaims.where(
         spark_funcs.col('prm_line').isin(
             'P32c', 'P32d'
         )
