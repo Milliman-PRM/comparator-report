@@ -20,7 +20,7 @@ META_SHARED = comparator_report.meta.project.gather_metadata()
 NAME_MODULE = 'outputs'
 PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
 PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
-PATH_RISKADJ = META_SHARED[15, 'out']
+PATH_REF = META_SHARED[15, 'out']
 
 RUNOUT = 3
 
@@ -38,8 +38,14 @@ def main() -> int:
             PATH_OUTPUTS / 'member_months.parquet',
             PATH_INPUTS / 'time_periods.parquet',
             PATH_INPUTS / 'outclaims.parquet',
+            PATH_REF / 'ref_link_hcg_researcher_line.parquet',
+            PATH_REF / 'ref_hcg_bt.parquet',                        
         ]
     }
+
+    mr_line_map = dfs_input['ref_link_hcg_researcher_line'].where(
+        spark_funcs.col('lob') == 'Medicare'
+    )
 
     min_incurred_date, max_incurred_date = dfs_input['time_periods'].where(
         spark_funcs.col('months_of_claims_runout') == RUNOUT
@@ -59,7 +65,7 @@ def main() -> int:
     ).groupBy(
         'elig_status',
     ).agg(
-        spark_funcs.format_number((spark_funcs.sum(spark_funcs.col('memmos')*spark_funcs.col('risk_score')) / spark_funcs.sum(spark_funcs.col('memmos'))), 2).alias('risk_score_avg')
+        spark_funcs.format_number((spark_funcs.sum(spark_funcs.col('memmos')*spark_funcs.col('risk_score')) / spark_funcs.sum(spark_funcs.col('memmos'))), 3).alias('risk_score_avg')
     )
 
     outclaims = dfs_input['outclaims'].where(
@@ -79,21 +85,114 @@ def main() -> int:
         on=(outclaims.member_id == member_months.member_id)
         & (outclaims.month == member_months.elig_month),
         how='inner'
+    ).join(
+        mr_line_map,
+        on=(outclaims.prm_line == mr_line_map.researcherline),
+        how='left_outer',
     )
 
-    hcc_risk_adj = read_sas_data(
-        sparkapp,
-        PATH_RISKADJ / 'mcrm_hcc_calibrations.sas7bdat',
+    hcc_risk_trim = dfs_input['ref_hcg_bt'].where(
+        (spark_funcs.col('lob') == 'Medicare')
+        & (spark_funcs.col('basis') == 'RS')
+    ).withColumn(
+        'hcc_bot_round',
+        spark_funcs.when(
+            spark_funcs.col('riskband') == '<0.50',
+            spark_funcs.lit(-1.0)
+        ).when(
+            spark_funcs.col('riskband') == '0.50-0.59',
+            spark_funcs.lit(.5)
+        ).when(
+            spark_funcs.col('riskband') == '0.60-0.69',
+            spark_funcs.lit(.6)
+        ).when(
+            spark_funcs.col('riskband') == '0.70-0.79',
+            spark_funcs.lit(.7)
+        ).when(
+            spark_funcs.col('riskband') == '0.80-0.89',
+            spark_funcs.lit(.8)
+        ).when(
+            spark_funcs.col('riskband') == '0.90-0.99',
+            spark_funcs.lit(.9)
+        ).when(
+            spark_funcs.col('riskband') == '1.00-1.09',
+            spark_funcs.lit(1.0)
+        ).when(
+            spark_funcs.col('riskband') == '1.10-1.19',
+            spark_funcs.lit(1.1)
+        ).when(
+            spark_funcs.col('riskband') == '1.20-1.34',
+            spark_funcs.lit(1.2)
+        ).when(
+            spark_funcs.col('riskband') == '1.35-1.49',
+            spark_funcs.lit(1.35)
+        ).when(
+            spark_funcs.col('riskband') == '1.50-1.74',
+            spark_funcs.lit(1.5)
+        ).when(
+            spark_funcs.col('riskband') == '1.75-2.00',
+            spark_funcs.lit(1.75)
+        ).otherwise(
+            spark_funcs.lit(2.0)
+        )
+    ).withColumn(
+        'hcc_top_round',
+        spark_funcs.when(
+            spark_funcs.col('riskband') == '<0.50',
+            spark_funcs.lit(.499)
+        ).when(
+            spark_funcs.col('riskband') == '0.50-0.59',
+            spark_funcs.lit(.599)
+        ).when(
+            spark_funcs.col('riskband') == '0.60-0.69',
+            spark_funcs.lit(.699)
+        ).when(
+            spark_funcs.col('riskband') == '0.70-0.79',
+            spark_funcs.lit(.799)
+        ).when(
+            spark_funcs.col('riskband') == '0.80-0.89',
+            spark_funcs.lit(.899)
+        ).when(
+            spark_funcs.col('riskband') == '0.90-0.99',
+            spark_funcs.lit(.999)
+        ).when(
+            spark_funcs.col('riskband') == '1.00-1.09',
+            spark_funcs.lit(1.099)
+        ).when(
+            spark_funcs.col('riskband') == '1.10-1.19',
+            spark_funcs.lit(1.199)
+        ).when(
+            spark_funcs.col('riskband') == '1.20-1.34',
+            spark_funcs.lit(1.349)
+        ).when(
+            spark_funcs.col('riskband') == '1.35-1.49',
+            spark_funcs.lit(1.499)
+        ).when(
+            spark_funcs.col('riskband') == '1.50-1.74',
+            spark_funcs.lit(1.749)
+        ).when(
+            spark_funcs.col('riskband') == '1.75-2.00',
+            spark_funcs.lit(1.99)
+        ).otherwise(
+            spark_funcs.lit(500.0)
+        )
+    ).select(
+        'btnumber',
+        'hcc_bot_round',
+        'hcc_top_round',
+        'admitfactor',
+        'utilfactor',
+        'pmpmfactor',
     )
 
     admits = outclaims_mem.select(
         'elig_status',
-        spark_funcs.col('prm_line').alias('mcrm_line'),
+        'btnumber',
         spark_funcs.lit('SNF').alias('metric_id'),
         'prm_admits',
     ).groupBy(
         'elig_status',
-        'mcrm_line',
+        'btnumber',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
@@ -104,17 +203,17 @@ def main() -> int:
         on='elig_status',
         how='inner',
     ).join(
-        hcc_risk_adj,
-        on='mcrm_line',
+        hcc_risk_trim,
+        on='btnumber',
         how='left_outer',
     ).where(
         spark_funcs.col('risk_score_avg').between(
-            spark_funcs.col('hcc_range_bottom'),
-            spark_funcs.col('hcc_range_top'),
+            spark_funcs.col('hcc_bot_round'),
+            spark_funcs.col('hcc_top_round'),
         )
     ).withColumn(
         'admits_riskadj',
-        spark_funcs.col('metric_value') / spark_funcs.col('factor_util')
+        spark_funcs.col('metric_value') / spark_funcs.col('admitfactor')
     )
 
     over_21 = outclaims_mem.where(
@@ -252,8 +351,6 @@ def main() -> int:
         snf_metrics,
         PATH_OUTPUTS / 'snf_metrics.parquet',
     )
-
-    hcc_risk_adj.unpersist()
 
     return 0
 
