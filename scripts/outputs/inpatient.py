@@ -11,7 +11,6 @@ import logging
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
 from prm.dates.utils import date_as_month
-from prm.spark.io_sas import read_sas_data
 
 import comparator_report.meta.project
 
@@ -213,9 +212,6 @@ def calc_risk_adj(
     """Calculated Risk Adjusted versions of Inpatient Metrics"""
     outclaims_ra = outclaims.where(
         spark_funcs.col('prm_line') != 'I31'
-    ).withColumn(
-        'mcrm_line',
-        spark_funcs.col('prm_line').substr(1, 3)
     )
 
     risk_score = member_months.select(
@@ -225,7 +221,7 @@ def calc_risk_adj(
     ).groupBy(
         'elig_status',
     ).agg(
-        spark_funcs.format_number((spark_funcs.sum(spark_funcs.col('memmos')*spark_funcs.col('risk_score')) / spark_funcs.sum(spark_funcs.col('memmos'))), 2).alias('risk_score_avg')
+        spark_funcs.format_number((spark_funcs.sum(spark_funcs.col('memmos')*spark_funcs.col('risk_score')) / spark_funcs.sum(spark_funcs.col('memmos'))), 3).alias('risk_score_avg')
     ).fillna({
         'risk_score_avg': 0
     })
@@ -258,20 +254,20 @@ def calc_risk_adj(
         'admits',
         'risk_score_avg',
         spark_funcs.when(
-            spark_funcs.col('factor_util').isNull(),
+            spark_funcs.col('admitfactor').isNull(),
             spark_funcs.lit(1)
         ).otherwise(
-            spark_funcs.col('factor_util')
-        ).alias('factor_util'),
+            spark_funcs.col('admitfactor')
+        ).alias('admitfactor'),
         spark_funcs.when(
             spark_funcs.col('risk_score_avg').between(
-                spark_funcs.col('hcc_range_bottom'),
-                spark_funcs.col('hcc_range_top'),
+                spark_funcs.col('hcc_bot_round'),
+                spark_funcs.col('hcc_top_round'),
                 ),
             spark_funcs.lit('Y'),
         ).otherwise(
             spark_funcs.when(
-                spark_funcs.col('factor_util').isNull(),
+                spark_funcs.col('admitfactor').isNull(),
                 spark_funcs.lit('Y')
             ).otherwise(
                 spark_funcs.lit('N')
@@ -281,7 +277,7 @@ def calc_risk_adj(
         spark_funcs.col('keep_flag') == 'Y'
     ).withColumn(
         'admits_riskadj',
-        spark_funcs.col('admits') / spark_funcs.col('factor_util'),
+        spark_funcs.col('admits') / spark_funcs.col('admitfactor'),
     )
 
     acute = outclaims_util.select(
@@ -297,32 +293,6 @@ def calc_risk_adj(
         outclaims_util.select(
             'elig_status',
             spark_funcs.lit('acute_riskadj').alias('metric_id'),
-            'admits_riskadj',
-        ).groupBy(
-            'elig_status',
-            'metric_id',
-        ).agg(
-            spark_funcs.sum('admits_riskadj').alias('metric_value')
-        )
-    )
-
-    med = outclaims_util.where(
-        spark_funcs.col('mcrm_line') == 'I11'
-    ).select(
-        'elig_status',
-        spark_funcs.lit('medical').alias('metric_id'),
-        'admits',
-    ).groupBy(
-        'elig_status',
-        'metric_id',
-    ).agg(
-        spark_funcs.sum('admits').alias('metric_value')
-    ).union(
-        outclaims_util.where(
-            spark_funcs.col('mcrm_line') == 'I11'
-        ).select(
-            'elig_status',
-            spark_funcs.lit('medical_riskadj').alias('metric_id'),
             'admits_riskadj',
         ).groupBy(
             'elig_status',
@@ -385,8 +355,6 @@ def calc_risk_adj(
     )
 
     type_union = acute.union(
-        med
-    ).union(
         med_gen
     ).union(
         surgery
@@ -444,8 +412,13 @@ def main() -> int:
             PATH_OUTPUTS / 'member_months.parquet',
             PATH_INPUTS / 'time_periods.parquet',
             PATH_INPUTS / 'outclaims.parquet',
+            PATH_INPUTS / 'ref_link_mcrm_line.parquet',
         ]
     }
+
+    mcrm_map = dfs_input['ref_link_mcrm_line'].where(
+        spark_funcs.col('type_hcg') == 'Medicare'
+    )
 
     min_incurred_date, max_incurred_date = dfs_input['time_periods'].where(
         spark_funcs.col('months_of_claims_runout') == RUNOUT
@@ -475,11 +448,108 @@ def main() -> int:
         on=(outclaims.member_id == member_months.member_id)
         & (outclaims.month == member_months.elig_month),
         how='inner'
+    ).join(
+        mcrm_map,
+        on='prm_line',
+        how='left_outer',
     )
 
-    hcc_risk_adj = read_sas_data(
-        sparkapp,
-        PATH_RISKADJ / 'mcrm_hcc_calibrations.sas7bdat',
+    hcc_risk_adj = sparkapp.load_df(
+        PATH_RISKADJ / 'ref_hcg_bt.parquet'
+    )
+
+    hcc_risk_trim = hcc_risk_adj.where(
+        (spark_funcs.col('lob') == 'Medicare')
+        & (spark_funcs.col('basis') == 'RS')
+    ).withColumn(
+        'hcc_bot_round',
+        spark_funcs.when(
+            spark_funcs.col('riskband') == '<0.50',
+            spark_funcs.lit(-1.0)
+        ).when(
+            spark_funcs.col('riskband') == '0.50-0.59',
+            spark_funcs.lit(.5)
+        ).when(
+            spark_funcs.col('riskband') == '0.60-0.69',
+            spark_funcs.lit(.6)
+        ).when(
+            spark_funcs.col('riskband') == '0.70-0.79',
+            spark_funcs.lit(.7)
+        ).when(
+            spark_funcs.col('riskband') == '0.80-0.89',
+            spark_funcs.lit(.8)
+        ).when(
+            spark_funcs.col('riskband') == '0.90-0.99',
+            spark_funcs.lit(.9)
+        ).when(
+            spark_funcs.col('riskband') == '1.00-1.09',
+            spark_funcs.lit(1.0)
+        ).when(
+            spark_funcs.col('riskband') == '1.10-1.19',
+            spark_funcs.lit(1.1)
+        ).when(
+            spark_funcs.col('riskband') == '1.20-1.34',
+            spark_funcs.lit(1.2)
+        ).when(
+            spark_funcs.col('riskband') == '1.35-1.49',
+            spark_funcs.lit(1.35)
+        ).when(
+            spark_funcs.col('riskband') == '1.50-1.74',
+            spark_funcs.lit(1.5)
+        ).when(
+            spark_funcs.col('riskband') == '1.75-2.00',
+            spark_funcs.lit(1.75)
+        ).otherwise(
+            spark_funcs.lit(2.0)
+        )
+    ).withColumn(
+        'hcc_top_round',
+        spark_funcs.when(
+            spark_funcs.col('riskband') == '<0.50',
+            spark_funcs.lit(.499)
+        ).when(
+            spark_funcs.col('riskband') == '0.50-0.59',
+            spark_funcs.lit(.599)
+        ).when(
+            spark_funcs.col('riskband') == '0.60-0.69',
+            spark_funcs.lit(.699)
+        ).when(
+            spark_funcs.col('riskband') == '0.70-0.79',
+            spark_funcs.lit(.799)
+        ).when(
+            spark_funcs.col('riskband') == '0.80-0.89',
+            spark_funcs.lit(.899)
+        ).when(
+            spark_funcs.col('riskband') == '0.90-0.99',
+            spark_funcs.lit(.999)
+        ).when(
+            spark_funcs.col('riskband') == '1.00-1.09',
+            spark_funcs.lit(1.099)
+        ).when(
+            spark_funcs.col('riskband') == '1.10-1.19',
+            spark_funcs.lit(1.199)
+        ).when(
+            spark_funcs.col('riskband') == '1.20-1.34',
+            spark_funcs.lit(1.349)
+        ).when(
+            spark_funcs.col('riskband') == '1.35-1.49',
+            spark_funcs.lit(1.499)
+        ).when(
+            spark_funcs.col('riskband') == '1.50-1.74',
+            spark_funcs.lit(1.749)
+        ).when(
+            spark_funcs.col('riskband') == '1.75-2.00',
+            spark_funcs.lit(1.99)
+        ).otherwise(
+            spark_funcs.lit(500.0)
+        )
+    ).select(
+        spark_funcs.col('btnumber').alias('mcrm_line'),
+        'hcc_bot_round',
+        'hcc_top_round',
+        'admitfactor',
+        'utilfactor',
+        'pmpmfactor',
     )
 
     snf_disch = outclaims_mem.where(
@@ -502,7 +572,7 @@ def main() -> int:
 
     one_day_summary = calc_one_day(outclaims_mem)
 
-    risk_adj_summary = calc_risk_adj(outclaims_mem, member_months, hcc_risk_adj)
+    risk_adj_summary = calc_risk_adj(outclaims_mem, member_months, hcc_risk_trim)
 
     readmit = calc_readmits(outclaims_mem)
 
