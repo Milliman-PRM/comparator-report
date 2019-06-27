@@ -10,7 +10,6 @@ import logging
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
 from prm.dates.utils import date_as_month
-from prm.spark.io_sas import read_sas_data
 
 import comparator_report.meta.project
 
