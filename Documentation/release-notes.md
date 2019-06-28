@@ -1,6 +1,9 @@
 ## Release Notes
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
+### v1.9.0
+  - Make risk-adjusted metrics compatible with HCG 2019 changes
+
 ### v1.8.0
   - Allow user to toggle between `Currently Assigned` and `Assigned During Selected Period`
   - Export BETOS summary with varied runouts
