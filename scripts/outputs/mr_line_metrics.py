@@ -157,13 +157,26 @@ def main() -> int:
     )
 
     outclaims = dfs_input['outclaims'].where(
-        spark_funcs.col('prm_fromdate').between(
-            min_incurred_date,
-            max_incurred_date,
+        spark_funcs.when(
+            spark_funcs.col('prm_line') == 'I31',
+            spark_funcs.col('prm_fromdate_case').between(
+                min_incurred_date,
+                max_incurred_date
+            )
+        ).otherwise(
+            spark_funcs.col('prm_fromdate').between(
+                min_incurred_date,
+                max_incurred_date,
+            )
         )
     ).withColumn(
         'month',
-        date_as_month(spark_funcs.col('prm_fromdate'))
+        spark_funcs.when(
+            spark_funcs.col('prm_line') == 'I31',
+            date_as_month(spark_funcs.col('prm_fromdate_case'))
+        ).otherwise(
+            date_as_month(spark_funcs.col('prm_fromdate'))
+        )
     )
 
     outclaims_mem = outclaims.join(
