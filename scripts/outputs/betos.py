@@ -36,9 +36,10 @@ def main() -> int:
     dfs_input = {
         path.stem: sparkapp.load_df(path)
         for path in [
-            PATH_OUTPUTS / 'member_months.parquet',
             PATH_INPUTS / 'time_periods.parquet',
             PATH_INPUTS / 'outclaims.parquet',
+            PATH_INPUTS / 'member_time_windows.parquet',
+            PATH_INPUTS / 'members.parquet',            
         ]
     }
 
@@ -52,7 +53,17 @@ def main() -> int:
     qexpu_runout_7 = max_incurred_date + timedelta(days=7)
     qexpu_runout_14 = max_incurred_date + timedelta(days=14)
 
-    member_months = dfs_input['member_months'].where(
+    members_ca = dfs_input['members'].where(
+        spark_funcs.col('assignment_indicator') == 'Y'
+    ).select(
+        'member_id'
+    )
+
+    member_months = dfs_input['member_time_windows'].join(
+        members_ca,
+        on='member_id',
+        how='inner',
+    ).where(
         spark_funcs.col('cover_medical') == 'Y'
     )
 
@@ -130,7 +141,7 @@ def main() -> int:
         'runout_14_yn',
         'fromdate_elig_yn',
         'todate_elig_yn',
-        'elig_status',
+        spark_funcs.col('elig_status_1').alias('elig_status'),
     ).agg(
         spark_funcs.sum('prm_costs').alias('costs')
     )
