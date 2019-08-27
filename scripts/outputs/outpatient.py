@@ -216,7 +216,7 @@ def main() -> int:
         path.stem: sparkapp.load_df(path)
         for path in [
             PATH_OUTPUTS / 'member_months.parquet',
-            PATH_INPUTS / 'time_periods.parquet',
+            PATH_INPUTS / 'member_time_windows.parquet',
             PATH_INPUTS / 'outclaims.parquet',
             PATH_REF / 'ref_link_hcg_researcher_line.parquet',
             PATH_REF / 'ref_hcg_bt.parquet',            
@@ -227,15 +227,16 @@ def main() -> int:
         spark_funcs.col('lob') == 'Medicare'
     )
 
-    min_incurred_date, max_incurred_date = dfs_input['time_periods'].where(
-        spark_funcs.col('months_of_claims_runout') == RUNOUT
-    ).select(
-        spark_funcs.col('reporting_date_start').alias('min_incurred_date'),
-        spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
-    ).collect()[0]
-
     member_months = dfs_input['member_months'].where(
         spark_funcs.col('cover_medical') == 'Y'
+    )
+
+    elig_memmos = dfs_input['member_time_windows'].where(
+        spark_funcs.col('cover_medical') == 'Y'
+    ).select(
+        'member_id',
+        'date_start',
+        'date_end',
     )
 
     risk_score = member_months.select(
@@ -250,12 +251,7 @@ def main() -> int:
         'risk_score_avg': 0
     })
 
-    outclaims = dfs_input['outclaims'].where(
-        spark_funcs.col('prm_fromdate').between(
-            min_incurred_date,
-            max_incurred_date,
-        )
-    ).withColumn(
+    outclaims = dfs_input['outclaims'].withColumn(
         'month',
         date_as_month(spark_funcs.col('prm_fromdate'))
     ).where(
@@ -265,6 +261,16 @@ def main() -> int:
     )
 
     outclaims_mem = outclaims.join(
+        elig_memmos,
+        on=[
+            outclaims.member_id == elig_memmos.member_id,
+            spark_funcs.col('prm_fromdate').between(
+                spark_funcs.col('date_start'),
+                spark_funcs.col('date_end'),
+            )
+            ],
+        how='inner',
+    ).join(
         member_months,
         on=(outclaims.member_id == member_months.member_id)
         & (outclaims.month == member_months.elig_month),
