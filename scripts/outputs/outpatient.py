@@ -173,22 +173,22 @@ def metric_calc_psp(
 
     psp_gen = outclaims_psp.select(
         'elig_status',
-        'mr_procs',
+        'mr_cases_admits',
     ).groupBy(
         'elig_status',
     ).agg(
-        spark_funcs.sum('mr_procs').alias('metric_value'),
+        spark_funcs.sum('mr_cases_admits').alias('metric_value'),
     )
 
     psp_ind = outclaims_psp.select(
         'elig_status',
         spark_funcs.col('psp_category').alias('metric_id'),
-        'mr_procs',
+        'mr_cases_admits',
     ).groupBy(
         'elig_status',
         'metric_id',
     ).agg(
-        spark_funcs.sum('mr_procs').alias('metric_value')
+        spark_funcs.sum('mr_cases_admits').alias('metric_value')
     ).select(
         'elig_status',
         spark_funcs.concat(
