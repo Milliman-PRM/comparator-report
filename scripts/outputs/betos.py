@@ -7,7 +7,9 @@
 """
 # pylint: disable=no-member
 import logging
+import os
 
+from datetime import date
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
 from prm.dates.utils import date_as_month
@@ -36,9 +38,10 @@ def main() -> int:
     dfs_input = {
         path.stem: sparkapp.load_df(path)
         for path in [
-            PATH_OUTPUTS / 'member_months.parquet',
             PATH_INPUTS / 'time_periods.parquet',
             PATH_INPUTS / 'outclaims.parquet',
+            PATH_INPUTS / 'member_time_windows.parquet',
+            PATH_INPUTS / 'members.parquet',            
         ]
     }
 
@@ -49,10 +52,27 @@ def main() -> int:
         spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
     ).collect()[0]
 
+    if os.environ.get('YTD_Only', 'False').lower() == 'true':
+        min_incurred_date = date(
+            max_incurred_date.year,
+            1,
+            1
+        )
+    
     qexpu_runout_7 = max_incurred_date + timedelta(days=7)
     qexpu_runout_14 = max_incurred_date + timedelta(days=14)
 
-    member_months = dfs_input['member_months'].where(
+    members_ca = dfs_input['members'].where(
+        spark_funcs.col('assignment_indicator') == 'Y'
+    ).select(
+        'member_id'
+    )
+
+    member_months = dfs_input['member_time_windows'].join(
+        members_ca,
+        on='member_id',
+        how='inner',
+    ).where(
         spark_funcs.col('cover_medical') == 'Y'
     )
 
@@ -118,8 +138,13 @@ def main() -> int:
 
     outclaims_mem = outclaims.join(
         member_months,
-        on=(outclaims.member_id == member_months.member_id)
-        & (outclaims.month == member_months.elig_month),
+        on=[
+            outclaims.member_id == member_months.member_id,
+            spark_funcs.col('prm_fromdate').between(
+                spark_funcs.col('date_start'),
+                spark_funcs.col('date_end')
+            )
+        ],
         how='inner'
     )
 
@@ -130,7 +155,7 @@ def main() -> int:
         'runout_14_yn',
         'fromdate_elig_yn',
         'todate_elig_yn',
-        'elig_status',
+        spark_funcs.col('elig_status_1').alias('elig_status'),
     ).agg(
         spark_funcs.sum('prm_costs').alias('costs')
     )

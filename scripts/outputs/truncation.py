@@ -7,7 +7,9 @@
 """
 # pylint: disable=no-member
 import logging
+import os
 
+from datetime import date
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
 from prm.dates.utils import date_as_month
@@ -45,11 +47,7 @@ def truncation_summary(
         date_as_month(spark_funcs.col(to_from_dt)),
     )
         
-    outclaims_mem = outclaims_dt_trim.join(
-        member_months,
-        on=['member_id', 'elig_month'],
-        how='inner'
-    ).withColumn(
+    outclaims_mem = outclaims_dt_trim.withColumn(
         'ime_sum',
         spark_funcs.when(
             spark_funcs.col('prm_costs') < 0,
@@ -198,7 +196,7 @@ def truncation_summary(
     )
 
     return truncation_summary
-    
+
 def main() -> int:
     """Calculate costs after truncation by eligibility status"""
     sparkapp = SparkApp(META_SHARED['pipeline_signature'])
@@ -206,9 +204,10 @@ def main() -> int:
     dfs_input = {
         path.stem: sparkapp.load_df(path)
         for path in [
-            PATH_OUTPUTS / 'member_months.parquet',
             PATH_INPUTS / 'time_periods.parquet',
             PATH_INPUTS / 'outclaims.parquet',
+            PATH_INPUTS / 'member_time_windows.parquet',
+            PATH_INPUTS / 'members.parquet',            
         ]
     }
 
@@ -219,11 +218,35 @@ def main() -> int:
         spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
     ).collect()[0]
 
+    if os.environ.get('YTD_Only', 'False').lower() == 'true':
+        min_incurred_date = date(
+            max_incurred_date.year,
+            1,
+            1
+        )
+
     qexpu_runout_7 = max_incurred_date + timedelta(days=7)
     qexpu_runout_14 = max_incurred_date + timedelta(days=14)
 
-    member_months = dfs_input['member_months'].where(
-        spark_funcs.col('cover_medical') == 'Y'
+    members_ca = dfs_input['members'].where(
+        spark_funcs.col('assignment_indicator') == 'Y'
+    ).select(
+        'member_id'
+    )
+
+    member_months = dfs_input['member_time_windows'].join(
+        members_ca,
+        on='member_id',
+        how='inner',
+    ).where(
+        (spark_funcs.col('cover_medical') == 'Y')
+        & (spark_funcs.col('elig_month').between(
+            min_incurred_date,
+            max_incurred_date
+        ))
+    ).withColumnRenamed(
+        'elig_status_1',
+        'elig_status',
     )
 
     dt_dict = {
@@ -233,15 +256,29 @@ def main() -> int:
         'qexpu_runout_14' : qexpu_runout_14,
     }
 
+    elig_claims = dfs_input['outclaims'].join(
+        member_months,
+        on=[
+            dfs_input['outclaims'].member_id == member_months.member_id,
+            spark_funcs.col('prm_fromdate').between(
+                spark_funcs.col('date_start'),
+                spark_funcs.col('date_end')
+            )
+        ],
+        how='inner',
+    ).drop(
+        member_months.member_id
+    )
+
     trunc_fromdt = truncation_summary(
-        dfs_input['outclaims'],
+        elig_claims,
         member_months,
         'prm_fromdate',
         dt_dict
     )
 
     trunc_todt = truncation_summary(
-        dfs_input['outclaims'],
+        elig_claims,
         member_months,
         'prm_todate',
         dt_dict
