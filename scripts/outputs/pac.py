@@ -200,6 +200,7 @@ def main() -> int:
             PATH_INPUTS / 'outclaims.parquet',
             PATH_INPUTS / 'decor_case.parquet',
             PATH_INPUTS / 'members.parquet',
+            PATH_INPUTS / 'ref_pac_benchmarks.parquet',
         ]
     }
 
@@ -264,11 +265,21 @@ def main() -> int:
         )
     )
 
+    pac_elig_drgs = dfs_input['ref_pac_benchmarks'].where(
+        spark_funcs.col('benchmarks_pac_freq_wm_readm').isNotNull()
+    ).select(
+        spark_funcs.col('msdrg').alias('prm_drg')
+    )
+
     pac_flags_trim = pac_flags.join(
         member_months,
         on=(pac_flags.member_id == member_months.member_id)
         & (pac_flags.month == member_months.elig_month),
         how='inner'
+    ).join(
+        pac_elig_drgs,
+        on='prm_drg',
+        how='inner',
     ).where(
         spark_funcs.col('prm_fromdate').between(
             min_incurred_date,
