@@ -7,6 +7,7 @@
 """
 # pylint: disable=no-member
 import logging
+import os
 
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
