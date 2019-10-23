@@ -1,6 +1,9 @@
 ## Release Notes
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
+### v1.10.0
+  - Began sourcing PRM reference data from the reference-data repository specified by environment variable reference_data_pathref
+  
 ### v1.9.0
   - Make risk-adjusted metrics compatible with HCG 2019 changes
 
