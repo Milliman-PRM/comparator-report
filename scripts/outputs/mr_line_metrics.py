@@ -7,10 +7,12 @@
 """
 # pylint: disable=no-member
 import logging
+import os
 
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
 from prm.dates.utils import date_as_month
+from pathlib import Path
 
 import comparator_report.meta.project
 
@@ -20,7 +22,7 @@ META_SHARED = comparator_report.meta.project.gather_metadata()
 NAME_MODULE = 'outputs'
 PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
 PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
-PATH_RISKADJ = META_SHARED[15, 'out']
+PATH_RISKADJ = Path(os.environ['reference_data_pathref'])
 
 RUNOUT = 3
 
