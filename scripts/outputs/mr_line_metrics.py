@@ -142,36 +142,24 @@ def main() -> int:
         path.stem: sparkapp.load_df(path)
         for path in [
             PATH_OUTPUTS / 'member_months.parquet',
-            PATH_INPUTS / 'time_periods.parquet',
+            PATH_INPUTS / 'member_time_windows.parquet',
             PATH_INPUTS / 'outclaims.parquet',
         ]
     }
-
-    min_incurred_date, max_incurred_date = dfs_input['time_periods'].where(
-        spark_funcs.col('months_of_claims_runout') == RUNOUT
-    ).select(
-        spark_funcs.col('reporting_date_start').alias('min_incurred_date'),
-        spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
-    ).collect()[0]
 
     member_months = dfs_input['member_months'].where(
         spark_funcs.col('cover_medical') == 'Y'
     )
 
-    outclaims = dfs_input['outclaims'].where(
-        spark_funcs.when(
-            spark_funcs.col('prm_line') == 'I31',
-            spark_funcs.col('prm_fromdate_case').between(
-                min_incurred_date,
-                max_incurred_date
-            )
-        ).otherwise(
-            spark_funcs.col('prm_fromdate').between(
-                min_incurred_date,
-                max_incurred_date,
-            )
-        )
-    ).withColumn(
+    elig_memmos = dfs_input['member_time_windows'].where(
+        spark_funcs.col('cover_medical') == 'Y'
+    ).select(
+        'member_id',
+        'date_start',
+        'date_end',
+    )
+
+    outclaims = dfs_input['outclaims'].withColumn(
         'month',
         spark_funcs.when(
             spark_funcs.col('prm_line') == 'I31',
@@ -182,6 +170,24 @@ def main() -> int:
     )
 
     outclaims_mem = outclaims.join(
+        elig_memmos,
+        on=[
+            outclaims.member_id == elig_memmos.member_id,
+            spark_funcs.when(
+                spark_funcs.col('prm_line') == 'I31',
+                spark_funcs.col('prm_fromdate_case').between(
+                    spark_funcs.col('date_start'),
+                    spark_funcs.col('date_end'),
+                )
+            ).otherwise(
+                spark_funcs.col('prm_fromdate').between(
+                    spark_funcs.col('date_start'),
+                    spark_funcs.col('date_end'),
+                )
+            )
+            ],
+        how='inner',
+    ).join(
         member_months,
         on=(outclaims.member_id == member_months.member_id)
         & (outclaims.month == member_months.elig_month),
