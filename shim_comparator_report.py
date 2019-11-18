@@ -36,8 +36,36 @@ def main() -> int:
     mutate_config()
 
     Members.kwargs_passthru = {
+        'YTD_Only': 'True',
+        'Currently_Assigned_Enabled': 'True',
+    }
+
+    luigi.build([CreateCSVs(META_SHARED['pipeline_signature'])])
+
+    rename_cr = META_SHARED['path_project_data'] / 'comparator_report_ca_ytd'
+    META_SHARED['path_data_comparator_report'].rename(rename_cr)
+
+    prm_ny_data_share.meta.project.setup_project()
+    comparator_report.meta.project.setup_project()
+    META_SHARED = comparator_report.meta.project.gather_metadata()
+
+    Members.kwargs_passthru = {
         'YTD_Only': 'False',
         'Currently_Assigned_Enabled': 'False',
+    }
+    
+    luigi.build([CreateCSVs(META_SHARED['pipeline_signature'])])
+
+    rename_cr = META_SHARED['path_project_data'] / 'comparator_report_adsp_rolling'
+    META_SHARED['path_data_comparator_report'].rename(rename_cr)
+
+    prm_ny_data_share.meta.project.setup_project()
+    comparator_report.meta.project.setup_project()
+    META_SHARED = comparator_report.meta.project.gather_metadata()
+
+    Members.kwargs_passthru = {
+        'YTD_Only': 'False',
+        'Currently_Assigned_Enabled': 'True',
     }
 
     return int(not luigi.build([CreateCSVs(META_SHARED['pipeline_signature'])]))
