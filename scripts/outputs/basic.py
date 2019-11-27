@@ -38,9 +38,16 @@ def main() -> int:
             PATH_INPUTS / 'members.parquet',
             PATH_OUTPUTS / 'member_months.parquet',
             PATH_INPUTS / 'outclaims.parquet',
-            PATH_INPUTS / 'member_time_windows.parquet',
+            PATH_INPUTS / 'time_periods.parquet',
         ]
     }
+
+    min_incurred_date, max_incurred_date = dfs_input['time_periods'].where(
+        spark_funcs.col('months_of_claims_runout') == RUNOUT
+    ).select(
+        spark_funcs.col('reporting_date_start').alias('min_incurred_date'),
+        spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
+    ).collect()[0]
 
     member_months = dfs_input['member_months']
 
@@ -92,36 +99,18 @@ def main() -> int:
          spark_funcs.sum('memmos')).alias('metric_value'),
     )
 
-    outclaims = dfs_input['outclaims'].withColumn(
-        'month',
-        spark_funcs.when(
-            spark_funcs.col('prm_line') == 'I31',
-            date_as_month(spark_funcs.col('prm_fromdate_case'))
-        ).otherwise(
-            date_as_month(spark_funcs.col('prm_fromdate'))
+    outclaims = dfs_input['outclaims'].where(
+        spark_funcs.col('prm_fromdate').between(
+            min_incurred_date,
+            max_incurred_date,
         )
-    )
-
-    elig_memmos = dfs_input['member_time_windows'].where(
-        spark_funcs.col('cover_medical') == 'Y'
-    ).select(
-        'member_id',
-        'date_start',
-        'date_end',
+    ).withColumn(
+        'month',
+        date_as_month(spark_funcs.col('prm_fromdate'))
     )
 
     outclaims_mem = outclaims.join(
-        elig_memmos,
-        on=[
-            outclaims.member_id == elig_memmos.member_id,
-            spark_funcs.col('prm_fromdate').between(
-                spark_funcs.col('date_start'),
-                spark_funcs.col('date_end'),
-            )
-            ],
-        how='inner',
-    ).join(
-        member_months,
+        member_months.where(spark_funcs.col('cover_medical') == 'Y'),
         on=(outclaims.member_id == member_months.member_id)
         & (outclaims.month == member_months.elig_month),
         how='inner'
@@ -186,7 +175,7 @@ def main() -> int:
         'metric_id',
     ).agg(
         spark_funcs.sum('costs_truncated').alias('metric_value')
-    )
+    )    
 
     mem_age = member_months.join(
         dfs_input['members'],
@@ -209,10 +198,7 @@ def main() -> int:
         'elig_status',
         'metric_id',
     ).agg(
-        spark_funcs.sum(
-            spark_funcs.col('memmos')
-            * spark_funcs.col('age_month')
-        ).alias('metric_value'),
+        spark_funcs.sum(spark_funcs.col('memmos')*spark_funcs.col('age_month')).alias('metric_value'),
     )
 
     basic_metrics = cnt_assigned_mems.union(
