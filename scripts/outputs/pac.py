@@ -198,7 +198,7 @@ def main() -> int:
         path.stem: sparkapp.load_df(path)
         for path in [
             PATH_OUTPUTS / 'member_months.parquet',
-            PATH_INPUTS / 'time_periods.parquet',
+            PATH_INPUTS / 'member_time_windows.parquet',
             PATH_INPUTS / 'outclaims.parquet',
             PATH_INPUTS / 'decor_case.parquet',
             PATH_INPUTS / 'members.parquet',
@@ -206,20 +206,26 @@ def main() -> int:
         ]
     }
 
-    min_incurred_date, max_incurred_date = dfs_input['time_periods'].where(
-        spark_funcs.col('months_of_claims_runout') == RUNOUT
-    ).select(
-        spark_funcs.col('reporting_date_start').alias('min_incurred_date'),
-        spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
-    ).collect()[0]
-
     member_months = dfs_input['member_months'].where(
         spark_funcs.col('cover_medical') == 'Y'
     )
 
+    elig_memmos = dfs_input['member_time_windows'].where(
+        spark_funcs.col('cover_medical') == 'Y'
+    ).select(
+        'member_id',
+        'date_start',
+        'date_end',
+    )
+
     outclaims = dfs_input['outclaims'].withColumn(
         'month',
-        date_as_month(spark_funcs.col('prm_fromdate'))
+        spark_funcs.when(
+            spark_funcs.col('prm_line') == 'I31',
+            date_as_month(spark_funcs.col('prm_fromdate_case'))
+        ).otherwise(
+            date_as_month(spark_funcs.col('prm_fromdate'))
+        )
     ).withColumn(
         'died_in_hospital',
         spark_funcs.when(
@@ -274,6 +280,16 @@ def main() -> int:
     )
 
     pac_flags_trim = pac_flags.join(
+        elig_memmos,
+        on=[
+            outclaims.member_id == elig_memmos.member_id,
+            spark_funcs.col('prm_fromdate').between(
+                spark_funcs.col('date_start'),
+                spark_funcs.col('date_end'),
+            )
+            ],
+        how='inner',
+    ).join(
         member_months,
         on=(pac_flags.member_id == member_months.member_id)
         & (pac_flags.month == member_months.elig_month),
@@ -282,11 +298,6 @@ def main() -> int:
         pac_elig_drgs,
         on='prm_drg',
         how='inner',
-    ).where(
-        spark_funcs.col('prm_fromdate').between(
-            min_incurred_date,
-            max_incurred_date,
-        )
     )
 
     pac_metrics = calc_pac_metrics(pac_flags_trim)
