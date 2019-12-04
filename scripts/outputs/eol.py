@@ -263,6 +263,19 @@ def main() -> int:
     hosp_lt3 = calc_metrics(mem_decor_stack, 'cnt_hospice_lt3days', 'hosp_lt3')
     cnt_chemo = calc_metrics(mem_decor_stack, 'cnt_chemo', 'cnt_chemo')
 
+    decedent_count_all = mem_elig_death.where(
+        spark_funcs.col('death_flag') == 1
+    ).select(
+        spark_funcs.lit('All').alias('elig_status'),
+        spark_funcs.lit('decedent_count').alias('metric_id'),
+        'member_id'
+    ).groupBy(
+        'elig_status',
+        'metric_id'
+    ).agg(
+        spark_funcs.countDistinct('member_id').alias('metric_value')
+    )
+
     eol_metrics = cnt_cancer.union(
         decedent_count
     ).union(
@@ -275,6 +288,8 @@ def main() -> int:
         hosp_lt3
     ).union(
         cnt_chemo
+    ).union(
+        decedent_count_all
     ).coalesce(10)
 
     sparkapp.save_df(
