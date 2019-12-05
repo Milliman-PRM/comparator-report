@@ -55,6 +55,17 @@ def main() -> int:
         spark_funcs.countDistinct('member_id').alias('metric_value')
     )
 
+    cnt_assigned_mems_all = member_months.select(
+        spark_funcs.lit('All').alias('elig_status'),
+        spark_funcs.lit('cnt_assigned_mems').alias('metric_id'),
+        'member_id',
+    ).groupBy(
+        'elig_status',
+        'metric_id',
+    ).agg(
+        spark_funcs.countDistinct('member_id').alias('metric_value')
+    )
+
     assigned_nonesrd = member_months.where(
         spark_funcs.col('elig_status') != 'ESRD'
     ).select(
@@ -227,6 +238,8 @@ def main() -> int:
         trunc_costs
     ).union(
         total_age
+    ).union(
+        cnt_assigned_mems_all
     ).coalesce(10)
 
     sparkapp.save_df(

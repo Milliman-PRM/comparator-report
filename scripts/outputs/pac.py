@@ -298,11 +298,6 @@ def main() -> int:
         pac_elig_drgs,
         on='prm_drg',
         how='inner',
-    ).where(
-        spark_funcs.col('prm_fromdate').between(
-            min_incurred_date,
-            max_incurred_date,
-        )
     )
 
     pac_metrics = calc_pac_metrics(pac_flags_trim)
