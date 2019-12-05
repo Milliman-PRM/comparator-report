@@ -7,10 +7,12 @@
 """
 # pylint: disable=no-member
 import logging
+import os
 
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
 from prm.dates.utils import date_as_month
+from pathlib import Path
 
 import comparator_report.meta.project
 
@@ -20,7 +22,7 @@ META_SHARED = comparator_report.meta.project.gather_metadata()
 NAME_MODULE = 'outputs'
 PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
 PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
-PATH_REF = META_SHARED[15, 'out']
+PATH_REF = Path(os.environ['reference_data_pathref'])
 
 RUNOUT = 3
 
@@ -410,7 +412,7 @@ def main() -> int:
         path.stem: sparkapp.load_df(path)
         for path in [
             PATH_OUTPUTS / 'member_months.parquet',
-            PATH_INPUTS / 'time_periods.parquet',
+            PATH_INPUTS / 'member_time_windows.parquet',
             PATH_INPUTS / 'outclaims.parquet',
             PATH_REF / 'ref_link_hcg_researcher_line.parquet',
             PATH_REF / 'ref_hcg_bt.parquet',
@@ -421,30 +423,41 @@ def main() -> int:
         spark_funcs.col('lob') == 'Medicare'
     )
 
-    min_incurred_date, max_incurred_date = dfs_input['time_periods'].where(
-        spark_funcs.col('months_of_claims_runout') == RUNOUT
-    ).select(
-        spark_funcs.col('reporting_date_start').alias('min_incurred_date'),
-        spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
-    ).collect()[0]
-
     member_months = dfs_input['member_months'].where(
         spark_funcs.col('cover_medical') == 'Y'
     )
 
-    outclaims = dfs_input['outclaims'].where(
-        spark_funcs.col('prm_fromdate').between(
-            min_incurred_date,
-            max_incurred_date,
-        )
-    ).withColumn(
+    elig_memmos = dfs_input['member_time_windows'].where(
+        spark_funcs.col('cover_medical') == 'Y'
+    ).select(
+        'member_id',
+        'date_start',
+        'date_end',
+    )
+
+    outclaims = dfs_input['outclaims'].withColumn(
         'month',
-        date_as_month(spark_funcs.col('prm_fromdate'))
+        spark_funcs.when(
+            spark_funcs.col('prm_line') == 'I31',
+            date_as_month(spark_funcs.col('prm_fromdate_case'))
+        ).otherwise(
+            date_as_month(spark_funcs.col('prm_fromdate'))
+        )
     ).where(
         spark_funcs.col('prm_line').like('I%')
     )
 
     outclaims_mem = outclaims.join(
+        elig_memmos,
+        on=[
+            outclaims.member_id == elig_memmos.member_id,
+            spark_funcs.col('prm_fromdate').between(
+                spark_funcs.col('date_start'),
+                spark_funcs.col('date_end'),
+            )
+            ],
+        how='inner',
+    ).join(
         member_months,
         on=(outclaims.member_id == member_months.member_id)
         & (outclaims.month == member_months.elig_month),

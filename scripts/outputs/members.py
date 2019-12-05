@@ -123,7 +123,12 @@ def main() -> int:
             spark_funcs.col('elig_status_1').alias('elig_status'),
             member_months.memmos,
             'risk_score',
-            'cover_medical',
+            spark_funcs.when(
+                member_months.memmos > 0,
+                spark_funcs.lit('Y'),
+            ).otherwise(
+                spark_funcs.lit('N')
+            ).alias('cover_medical'),
         ).where(
             spark_funcs.col('elig_status') != 'Unknown'
         )
@@ -142,7 +147,12 @@ def main() -> int:
             spark_funcs.col('elig_status_1').alias('elig_status'),
             member_months.memmos,
             'risk_score',
-            'cover_medical',
+            spark_funcs.when(
+                member_months.memmos > 0,
+                spark_funcs.lit('Y'),
+            ).otherwise(
+                spark_funcs.lit('N')
+            ).alias('cover_medical'),
         ).where(
             spark_funcs.col('elig_status') != 'Unknown'
         )
