@@ -68,6 +68,13 @@ def main() -> int:
         spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
     ).collect()[0]
 
+    if os.environ.get('YTD_Only', 'False').lower() == 'true':
+        min_incurred_date = date(
+            max_incurred_date.year,
+            1,
+            1
+        )
+
     member_months = dfs_input['member_months']
 
     mem_elig_distinct = member_months.select(

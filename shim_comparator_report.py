@@ -15,7 +15,7 @@ from indypy.nonstandard.ext_luigi import mutate_config
 import prm_ny_data_share.meta.project
 import comparator_report.meta.project
 
-from comparator_report.pipeline.definitions.outputs import CreateCSVs, Members
+from comparator_report.pipeline.definitions.outputs import CreateCSVs, Members, EOL
 
 LOGGER = logging.getLogger(__name__)
 
@@ -35,10 +35,13 @@ def main() -> int:
 
     mutate_config()
 
-    Members.kwargs_passthru = {
+    _comparator_kwargs = {
         'YTD_Only': 'True',
-        'Currently_Assigned_Enabled': 'True',
+        'Currently_Assigned_Enabled': 'True'
     }
+
+    Members.kwargs_passthru = _comparator_kwargs
+    EOL.kwargs_passthru = _comparator_kwargs
 
     luigi.build([CreateCSVs(META_SHARED['pipeline_signature'])])
 
@@ -49,10 +52,13 @@ def main() -> int:
     comparator_report.meta.project.setup_project()
     META_SHARED = comparator_report.meta.project.gather_metadata()
 
-    Members.kwargs_passthru = {
+    _comparator_kwargs = {
         'YTD_Only': 'False',
-        'Currently_Assigned_Enabled': 'False',
+        'Currently_Assigned_Enabled': 'True'
     }
+
+    Members.kwargs_passthru = _comparator_kwargs
+    EOL.kwargs_passthru = _comparator_kwargs
     
     luigi.build([CreateCSVs(META_SHARED['pipeline_signature'])])
 
@@ -63,10 +69,13 @@ def main() -> int:
     comparator_report.meta.project.setup_project()
     META_SHARED = comparator_report.meta.project.gather_metadata()
 
-    Members.kwargs_passthru = {
+    _comparator_kwargs = {
         'YTD_Only': 'False',
-        'Currently_Assigned_Enabled': 'True',
+        'Currently_Assigned_Enabled': 'True'
     }
+    
+    Members.kwargs_passthru = _comparator_kwargs
+    EOL.kwargs_passthru = _comparator_kwargs
 
     return int(not luigi.build([CreateCSVs(META_SHARED['pipeline_signature'])]))
 
