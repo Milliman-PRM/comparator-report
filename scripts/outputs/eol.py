@@ -9,6 +9,7 @@
 import logging
 import os
 
+from datetime import date
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
 import comparator_report.meta.project
