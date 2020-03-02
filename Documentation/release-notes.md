@@ -1,6 +1,9 @@
 ## Release Notes
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
+### v1.11.0
+  - Add functionality to run on 7/1 ACO based on `mem_report_hier_2`
+  
 ### v1.10.0
   - Began sourcing PRM reference data from the reference-data repository specified by environment variable reference_data_pathref
   - Count `mr_cases_admits` instead of `mr_procs` for outpatient PSPs
