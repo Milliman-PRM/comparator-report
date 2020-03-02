@@ -37,7 +37,8 @@ def main() -> int:
 
     _comparator_kwargs = {
         'YTD_Only': 'True',
-        'Currently_Assigned_Enabled': 'True'
+        'Currently_Assigned_Enabled': 'True',
+        '7_1ACOFlag_Enabled': 'False'
     }
 
     Members.kwargs_passthru = _comparator_kwargs
@@ -54,7 +55,8 @@ def main() -> int:
 
     _comparator_kwargs = {
         'YTD_Only': 'False',
-        'Currently_Assigned_Enabled': 'True'
+        'Currently_Assigned_Enabled': 'True',
+        '7_1ACOFlag_Enabled': 'False'
     }
 
     Members.kwargs_passthru = _comparator_kwargs
@@ -71,7 +73,8 @@ def main() -> int:
 
     _comparator_kwargs = {
         'YTD_Only': 'False',
-        'Currently_Assigned_Enabled': 'True'
+        'Currently_Assigned_Enabled': 'True',
+        '7_1ACOFlag_Enabled': 'False'
     }
     
     Members.kwargs_passthru = _comparator_kwargs
