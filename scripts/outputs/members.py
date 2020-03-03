@@ -56,11 +56,11 @@ def main() -> int:
             1
         )
 
-    if os.environ.get('Currently_Assigned_Enabled', 'False').lower() == 'true':
+    if os.environ.get('Currently_Assigned_Enabled', 'False').lower() == 'true' or os.environ.get('7_1ACOFlag_Enabled', 'False').lower() == 'true':
         memmos_filter = spark_funcs.col('elig_month').between(
                             min_incurred_date,
                             max_incurred_date,
-                        )  
+                        )
     else:
         memmos_filter = (spark_funcs.col('elig_month').between(
                             min_incurred_date,
@@ -132,6 +132,40 @@ def main() -> int:
         ).where(
             spark_funcs.col('elig_status') != 'Unknown'
         )
+    elif os.environ.get('7_1ACOFlag_Enabled', 'False').lower() == 'true':
+        current_assigned = dfs_input['members'].filter(
+            spark_funcs.col('mem_report_hier_2') == 'Y'
+        ).select(
+            'member_id',
+        )        
+        
+        member_join = member_months.join(
+            recent_info,
+            on=['member_id', 'elig_month'],
+            how='inner'
+        ).join(
+            risk_scores,
+            on='member_id',
+            how='left_outer'
+        ).join(
+            current_assigned,
+            on='member_id',
+            how='inner',
+        ).select(
+            'member_id',
+            'elig_month',
+            spark_funcs.col('elig_status_1').alias('elig_status'),
+            member_months.memmos,
+            'risk_score',
+            spark_funcs.when(
+                member_months.memmos > 0,
+                spark_funcs.lit('Y'),
+            ).otherwise(
+                spark_funcs.lit('N')
+            ).alias('cover_medical'),
+        ).where(
+            spark_funcs.col('elig_status') != 'Unknown'
+        )            
     else:
         member_join = member_months.join(
             recent_info,
