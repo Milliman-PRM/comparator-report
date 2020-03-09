@@ -364,7 +364,7 @@ def main() -> int:
             spark_funcs.lit(1.749)
         ).when(
             spark_funcs.col('riskband') == '1.75-2.00',
-            spark_funcs.lit(1.99)
+            spark_funcs.lit(1.999)
         ).otherwise(
             spark_funcs.lit(500.0)
         )
