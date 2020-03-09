@@ -1,6 +1,9 @@
 ## Release Notes
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
+### v1.11.1
+  - Fix issue for elig statuses with risk scores between 1.99 and 2.0
+  
 ### v1.11.0
   - Add functionality to run on 7/1 ACO based on `mem_report_hier_2`
   
