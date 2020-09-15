@@ -10,6 +10,7 @@ import logging
 import os
 
 from datetime import date
+from datetime import datetime
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
 import comparator_report.meta.project
@@ -76,6 +77,22 @@ def main() -> int:
             1,
             1
         )
+
+    if os.environ.get('Custom_Min_Incurred', 'None').lower() != 'None':
+        min_incurred_new = datetime.strptime(os.environ.get('Custom_Min_Incurred'), '%Y-%m-%d')
+        max_incurred_new = datetime.strptime(os.environ.get('Custom_Max_Incurred'), '%Y-%m-%d')
+        
+        min_incurred_date = date(
+            min_incurred_new.year,
+            min_incurred_new.month,
+            min_incurred_new.day,
+        )
+        
+        max_incurred_date = date(
+            max_incurred_new.year,
+            max_incurred_new.month,
+            max_incurred_new.day,
+        )        
 
     member_months = dfs_input['member_months']
 
