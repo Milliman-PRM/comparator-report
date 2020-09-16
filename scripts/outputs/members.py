@@ -57,7 +57,7 @@ def main() -> int:
             1
         )
 
-    if os.environ.get('Custom_Min_Incurred', 'None').lower() != 'None':
+    if os.environ.get('Custom_Min_Incurred', 'None').lower() != 'none':
         min_incurred_new = datetime.strptime(os.environ.get('Custom_Min_Incurred'), '%Y-%m-%d')
         max_incurred_new = datetime.strptime(os.environ.get('Custom_Max_Incurred'), '%Y-%m-%d')
         
