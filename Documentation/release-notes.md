@@ -1,6 +1,9 @@
 ## Release Notes
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
+### v1.11.2
+  - Update truncation thresholds to 2020
+
 ### v1.11.1
   - Fix issue for elig statuses with risk scores between 1.99 and 2.0
   
