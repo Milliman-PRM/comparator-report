@@ -10,6 +10,7 @@ import logging
 import os
 
 from datetime import date
+from datetime import datetime
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
 from pyspark.sql import Window
@@ -56,6 +57,22 @@ def main() -> int:
             1
         )
 
+    if os.environ.get('Custom_Min_Incurred', 'None').lower() != 'none':
+        min_incurred_new = datetime.strptime(os.environ.get('Custom_Min_Incurred'), '%Y-%m-%d')
+        max_incurred_new = datetime.strptime(os.environ.get('Custom_Max_Incurred'), '%Y-%m-%d')
+        
+        min_incurred_date = date(
+            min_incurred_new.year,
+            min_incurred_new.month,
+            min_incurred_new.day,
+        )
+        
+        max_incurred_date = date(
+            max_incurred_new.year,
+            max_incurred_new.month,
+            max_incurred_new.day,
+        )
+        
     if os.environ.get('Currently_Assigned_Enabled', 'False').lower() == 'true' or os.environ.get('7_1ACOFlag_Enabled', 'False').lower() == 'true':
         memmos_filter = spark_funcs.col('elig_month').between(
                             min_incurred_date,

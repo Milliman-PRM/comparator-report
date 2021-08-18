@@ -7,7 +7,10 @@
 """
 # pylint: disable=no-member
 import logging
+import os
 
+from datetime import date
+from datetime import datetime
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
 from prm.spark.io_txt import export_csv
@@ -44,7 +47,23 @@ def main() -> int:
         spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
     ).collect()[0]
 
-    time_period = str(min_incurred_date.year) + 'Q' + str((min_incurred_date.month - 1) // 3 + 1) + '_' + str(max_incurred_date.year) + 'Q' + str((max_incurred_date.month - 1) // 3 + 1)
+    if os.environ.get('Custom_Min_Incurred', 'None').lower() != 'none':
+        min_incurred_new = datetime.strptime(os.environ.get('Custom_Min_Incurred'), '%Y-%m-%d')
+        max_incurred_new = datetime.strptime(os.environ.get('Custom_Max_Incurred'), '%Y-%m-%d')
+        
+        min_incurred_date = date(
+            min_incurred_new.year,
+            min_incurred_new.month,
+            min_incurred_new.day,
+        )
+        
+        max_incurred_date = date(
+            max_incurred_new.year,
+            max_incurred_new.month,
+            max_incurred_new.day,
+        )        
+
+    time_period = min_incurred_date.strftime("%b%Y") + '_' + max_incurred_date.strftime("%b%Y")
 
     metrics_stack = dfs_input['basic_metrics'].union(
         dfs_input['inpatient_metrics']
