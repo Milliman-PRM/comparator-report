@@ -38,10 +38,12 @@ def calc_metrics(
         spark_funcs.col('death_flag') == 1
     ).select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit(metric_name).alias('metric_id'),
         spark_funcs.col(metric_id)
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id'
     ).agg(
         spark_funcs.sum(metric_id).alias('metric_value')
@@ -82,6 +84,7 @@ def main() -> int:
     mem_elig_distinct = member_months.select(
         'member_id',
         'elig_status',
+        'prv_hier_2',
     ).distinct()
 
     mem_distinct = member_months.select(
@@ -237,6 +240,7 @@ def main() -> int:
     ).select(
         'member_id',
         'elig_status',
+        'prv_hier_2',
         'death_flag',
         'cnt_cancer',
         'total_cost',
@@ -251,6 +255,7 @@ def main() -> int:
     ).select(
         'member_id',
         spark_funcs.lit('Non-ESRD').alias('elig_status'),
+        'prv_hier_2',
         'death_flag',
         'cnt_cancer',
         'total_cost',
@@ -276,10 +281,12 @@ def main() -> int:
         spark_funcs.col('death_flag') == 1
     ).select(
         spark_funcs.lit('All').alias('elig_status'),
+        'prv_hier_2',
         spark_funcs.lit('decedent_count').alias('metric_id'),
         'member_id'
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id'
     ).agg(
         spark_funcs.countDistinct('member_id').alias('metric_value')

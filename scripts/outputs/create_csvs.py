@@ -65,10 +65,12 @@ def main() -> int:
     ).select(
         spark_funcs.lit('Non-ESRD').alias('elig_status'),
         'metric_id',
+        'prv_hier_2',
         'metric_value',
     ).groupBy(
         'elig_status',
         'metric_id',
+        'prv_hier_2',
     ).agg(
         spark_funcs.sum('metric_value').alias('metric_value')
     )
@@ -78,7 +80,11 @@ def main() -> int:
     ).union(
         dfs_input['eol_metrics']
     ).select(
-        spark_funcs.lit(META_SHARED['name_client']).alias('name_client'),
+        spark_funcs.concat(
+            spark_funcs.lit(META_SHARED['name_client']),
+            spark_funcs.lit("-"),
+            spark_funcs.col('prv_hier_2')
+        ).alias('name_client'),
         spark_funcs.lit(time_period).alias('time_period'),
         'elig_status',
         spark_funcs.lit('').alias('metric_category'),
@@ -106,6 +112,7 @@ def main() -> int:
         spark_funcs.lit(META_SHARED['name_client']).alias('name_client'),
         spark_funcs.lit(time_period).alias('time_period'),
         'elig_status',
+        'prv_hier_2',
         'prm_drg',
         'pac_count',
         'pac_acute_count',

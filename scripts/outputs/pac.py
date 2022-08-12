@@ -102,10 +102,12 @@ def calc_pac_metrics(
 
     pac_count = outclaims_pac.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('pac_epi').alias('metric_id'),
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
@@ -115,10 +117,12 @@ def calc_pac_metrics(
         spark_funcs.col('pac_died_in_hospital_yn') == 'Y'
     ).select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('pac_died_in_hosp').alias('metric_id'),
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
@@ -128,10 +132,12 @@ def calc_pac_metrics(
         spark_funcs.col('pac_has_ip_acute_yn') == 'Y'
     ).select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('pac_ipreadmit').alias('metric_id'),
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
@@ -141,10 +147,12 @@ def calc_pac_metrics(
         spark_funcs.col('pac_has_snf_yn') == 'Y'
     ).select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('pac_snf').alias('metric_id'),
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
@@ -154,10 +162,12 @@ def calc_pac_metrics(
         spark_funcs.col('pac_has_ip_rehab_yn') == 'Y'
     ).select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('pac_rehab').alias('metric_id'),
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
@@ -167,10 +177,12 @@ def calc_pac_metrics(
         spark_funcs.col('pac_has_hh_yn') == 'Y'
     ).select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('pac_hh').alias('metric_id'),
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
@@ -306,6 +318,7 @@ def main() -> int:
         'pac_index_yn = "Y"'
     ).select(
         'elig_status',
+        'prv_hier_2',
         'prm_drg',
         'pac_index_yn',
         'pac_has_ip_acute_yn',
@@ -316,6 +329,7 @@ def main() -> int:
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'prm_drg',
     ).agg(
         spark_funcs.sum('prm_admits').alias('pac_count'),

@@ -40,19 +40,23 @@ def calc_pqi(
 
     pqi_gen = outclaims_pqi.select(
         'elig_status',
+        'prv_hier_2',
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value'),
     )
 
     pqi_ind = outclaims_pqi.select(
         'elig_status',
+        'prv_hier_2',
         'prm_ahrq_pqi',
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'prm_ahrq_pqi',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
@@ -60,6 +64,7 @@ def calc_pqi(
 
     pqis = pqi_gen.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('pqi').alias('metric_id'),
         'metric_value',
     ).union(
@@ -68,6 +73,7 @@ def calc_pqi(
             spark_funcs.concat(spark_funcs.col('prm_ahrq_pqi'), spark_funcs.lit('_admits'))
         ).select(
             'elig_status',
+            'prv_hier_2',
             'metric_id',
             'metric_value',
         )
@@ -87,24 +93,29 @@ def calc_psp(
 
     psp_gen = outclaims_psp.select(
         'elig_status',
+        'prv_hier_2',
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value'),
     )
 
     psp_ind = outclaims_psp.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.col('psp_category').alias('metric_id'),
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
     ).select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.concat(
             spark_funcs.lit('psp_admits_'),
             spark_funcs.col('metric_id'),
@@ -114,6 +125,7 @@ def calc_psp(
 
     psps = psp_gen.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('psp_admits').alias('metric_id'),
         'metric_value',
     ).union(
@@ -132,6 +144,7 @@ def calc_one_day(
 
     one_day_denom = outclaims_od.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.when(
             spark_funcs.col('prm_line').like('I11%'),
             spark_funcs.lit('medical'),
@@ -141,6 +154,7 @@ def calc_one_day(
         'prm_admits'
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'ip_type',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
@@ -150,6 +164,7 @@ def calc_one_day(
         spark_funcs.col('prm_util') == 1
     ).select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.when(
             spark_funcs.col('prm_line').like('I11%'),
             spark_funcs.lit('medical'),
@@ -159,6 +174,7 @@ def calc_one_day(
         'prm_admits'
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'ip_type',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
@@ -166,20 +182,24 @@ def calc_one_day(
 
     total = one_day_denom.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('Denom_1_Day_LOS').alias('metric_id'),
         'metric_value',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('metric_value').alias('metric_value')
     ).union(
         one_day_numer.select(
             'elig_status',
+            'prv_hier_2',
             spark_funcs.lit('Num_1_Day_LOS').alias('metric_id'),
             'metric_value',
         ).groupBy(
             'elig_status',
+            'prv_hier_2',
             'metric_id',
         ).agg(
             spark_funcs.sum('metric_value').alias('metric_value')
@@ -191,6 +211,7 @@ def calc_one_day(
             'ip_type = "medical"'
         ).select(
             'elig_status',
+            'prv_hier_2',
             spark_funcs.lit('Num_1_Day_LOS_Medical').alias('metric_id'),
             'metric_value',
         ).union(
@@ -198,6 +219,7 @@ def calc_one_day(
                 'ip_type = "medical"'
             ).select(
                 'elig_status',
+                'prv_hier_2',
                 spark_funcs.lit('Denom_1_Day_LOS_Medical').alias('metric_id'),
                 'metric_value',
             )
@@ -218,10 +240,12 @@ def calc_risk_adj(
 
     risk_score = member_months.select(
         'elig_status',
+        'prv_hier_2',
         'memmos',
         'risk_score',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
     ).agg(
         spark_funcs.format_number((spark_funcs.sum(spark_funcs.col('memmos')*spark_funcs.col('risk_score')) / spark_funcs.sum(spark_funcs.col('memmos'))), 3).alias('risk_score_avg')
     ).fillna({
@@ -230,18 +254,20 @@ def calc_risk_adj(
 
     outclaims_admits = outclaims_ra.select(
         'elig_status',
+        'prv_hier_2',
         'prm_line',
         'btnumber',
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'prm_line',
         'btnumber',
     ).agg(
         spark_funcs.sum('prm_admits').alias('admits')
     ).join(
         risk_score,
-        on='elig_status',
+        on=['elig_status','prv_hier_2'],
         how='left_outer',
     )
 
@@ -251,6 +277,7 @@ def calc_risk_adj(
         how='left_outer',
     ).select(
         'elig_status',
+        'prv_hier_2',
         'btnumber',
         'prm_line',
         'admits',
@@ -284,20 +311,24 @@ def calc_risk_adj(
 
     acute = outclaims_util.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('acute').alias('metric_id'),
         'admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('admits').alias('metric_value')
     ).union(
         outclaims_util.select(
             'elig_status',
+            'prv_hier_2',
             spark_funcs.lit('acute_riskadj').alias('metric_id'),
             'admits_riskadj',
         ).groupBy(
             'elig_status',
+            'prv_hier_2',
             'metric_id',
         ).agg(
             spark_funcs.sum('admits_riskadj').alias('metric_value')
@@ -308,10 +339,12 @@ def calc_risk_adj(
         spark_funcs.col('prm_line') == 'I11a'
     ).select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('medical_general').alias('metric_id'),
         'admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('admits').alias('metric_value')
@@ -320,10 +353,12 @@ def calc_risk_adj(
             spark_funcs.col('prm_line') == 'I11a'
         ).select(
             'elig_status',
+            'prv_hier_2',
             spark_funcs.lit('medical_general_riskadj').alias('metric_id'),
             'admits_riskadj',
         ).groupBy(
             'elig_status',
+            'prv_hier_2',
             'metric_id',
         ).agg(
             spark_funcs.sum('admits_riskadj').alias('metric_value')
@@ -334,10 +369,12 @@ def calc_risk_adj(
         spark_funcs.col('prm_line') == 'I12'
     ).select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('surgical').alias('metric_id'),
         'admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('admits').alias('metric_value')
@@ -346,10 +383,12 @@ def calc_risk_adj(
             spark_funcs.col('prm_line') == 'I12'
         ).select(
             'elig_status',
+            'prv_hier_2',
             spark_funcs.lit('surgical_riskadj').alias('metric_id'),
             'admits_riskadj',
         ).groupBy(
             'elig_status',
+            'prv_hier_2',
             'metric_id',
         ).agg(
             spark_funcs.sum('admits_riskadj').alias('metric_value')
@@ -376,10 +415,12 @@ def calc_readmits(
         'prm_readmit_potential_yn == "Y"'
     ).select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('cnt_pot_readmits').alias('metric_id'),
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
@@ -389,10 +430,12 @@ def calc_readmits(
         'prm_readmit_all_cause_yn == "Y"'
     ).select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('cnt_ip_readmits').alias('metric_id'),
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
@@ -567,10 +610,12 @@ def main() -> int:
         (spark_funcs.col('dischargestatus') == '03')
     ).select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('disch_snf').alias('metric_id'),
         'prm_admits'
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')

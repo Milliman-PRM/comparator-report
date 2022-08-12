@@ -39,6 +39,7 @@ def main() -> int:
             PATH_INPUTS / 'time_periods.parquet',
             PATH_INPUTS / 'members.parquet',
             PATH_INPUTS / 'risk_scores.parquet',
+            PATH_INPUTS / 'providers.parquet',
         ]
     }
 
@@ -69,9 +70,14 @@ def main() -> int:
 
     member_months = dfs_input['member_time_windows'].filter(
         memmos_filter
+    ).join(
+        dfs_input['providers'],
+        on=dfs_input['member_time_windows'].mem_prv_id_align == dfs_input['providers'].prv_id,   
+        how='left'
     ).groupBy(
         'member_id',
         'elig_month',
+        'prv_hier_2'
     ).agg(
         spark_funcs.sum('memmos_medical').alias('memmos')
     )
@@ -79,12 +85,17 @@ def main() -> int:
     recent_info_window = Window().partitionBy(
         'member_id',
         'elig_month',
+        'prv_hier_2',
     ).orderBy(
         spark_funcs.desc('date_end'),
     )
 
     recent_info = dfs_input['member_time_windows'].filter(
         memmos_filter
+    ).join(
+        dfs_input['providers'],
+        on=dfs_input['member_time_windows'].mem_prv_id_align == dfs_input['providers'].prv_id,   
+        how='left'
     ).select(
         '*',
         spark_funcs.row_number().over(recent_info_window).alias('order'),
@@ -107,7 +118,7 @@ def main() -> int:
         
         member_join = member_months.join(
             recent_info,
-            on=['member_id', 'elig_month'],
+            on=['member_id', 'elig_month','prv_hier_2'],
             how='inner'
         ).join(
             risk_scores,
@@ -119,6 +130,7 @@ def main() -> int:
             how='inner',
         ).select(
             'member_id',
+            'prv_hier_2',
             'elig_month',
             spark_funcs.col('elig_status_1').alias('elig_status'),
             member_months.memmos,
@@ -141,7 +153,7 @@ def main() -> int:
         
         member_join = member_months.join(
             recent_info,
-            on=['member_id', 'elig_month'],
+            on=['member_id', 'elig_month','prv_hier_2'],
             how='inner'
         ).join(
             risk_scores,
@@ -153,6 +165,7 @@ def main() -> int:
             how='inner',
         ).select(
             'member_id',
+            'prv_hier_2',
             'elig_month',
             spark_funcs.col('elig_status_1').alias('elig_status'),
             member_months.memmos,
@@ -169,7 +182,7 @@ def main() -> int:
     else:
         member_join = member_months.join(
             recent_info,
-            on=['member_id', 'elig_month'],
+            on=['member_id', 'elig_month','prv_hier_2'],
             how='inner'
         ).join(
             risk_scores,
@@ -177,6 +190,7 @@ def main() -> int:
             how='left_outer'
         ).select(
             'member_id',
+            'prv_hier_2',
             'elig_month',
             spark_funcs.col('elig_status_1').alias('elig_status'),
             member_months.memmos,

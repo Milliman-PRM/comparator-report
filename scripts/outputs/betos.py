@@ -131,6 +131,7 @@ def main() -> int:
         'fromdate_elig_yn',
         'todate_elig_yn',
         'elig_status',
+        'prv_hier_2'
     ).agg(
         spark_funcs.sum('prm_costs').alias('costs')
     )

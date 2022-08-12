@@ -62,10 +62,12 @@ def main() -> int:
 
     risk_score = member_months.select(
         'elig_status',
+        'prv_hier_2',
         'memmos',
         'risk_score',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
     ).agg(
         spark_funcs.format_number((spark_funcs.sum(spark_funcs.col('memmos')*spark_funcs.col('risk_score')) / spark_funcs.sum(spark_funcs.col('memmos'))), 3).alias('risk_score_avg')
     )
@@ -194,11 +196,13 @@ def main() -> int:
 
     admits = outclaims_mem.select(
         'elig_status',
+        'prv_hier_2',
         'btnumber',
         spark_funcs.lit('SNF').alias('metric_id'),
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'btnumber',
         'metric_id',
     ).agg(
@@ -207,7 +211,7 @@ def main() -> int:
 
     admits_riskadj = admits.join(
         risk_score,
-        on='elig_status',
+        on=['elig_status','prv_hier_2'],
         how='inner',
     ).join(
         hcc_risk_trim,
@@ -227,10 +231,12 @@ def main() -> int:
         spark_funcs.col('prm_util') > 21
     ).select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('number_SNF_over_21_days').alias('metric_id'),
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
@@ -240,10 +246,12 @@ def main() -> int:
         spark_funcs.col('prm_readmit_all_cause_yn') == 'Y'
     ).select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('number_SNF_readmits').alias('metric_id'),
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
@@ -251,10 +259,12 @@ def main() -> int:
 
     distinct_snfs = outclaims_mem.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('distinct_SNFs').alias('metric_id'),
         'providerid',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.countDistinct('providerid'),
@@ -325,10 +335,12 @@ def main() -> int:
         how='inner',
     ).select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('SNF_Readmits').alias('metric_id'),
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
@@ -336,11 +348,13 @@ def main() -> int:
             
     snf_metrics = admits.select(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
         'metric_value',
     ).union(
         admits_riskadj.select(
             'elig_status',
+            'prv_hier_2',
             spark_funcs.lit('SNF_rskadj').alias('metric_id'),
             spark_funcs.col('admits_riskadj').alias('metric_value'),
         )

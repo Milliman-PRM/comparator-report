@@ -44,10 +44,12 @@ def metric_calc(
 
     util = outclaims_mcrm.select(
         'elig_status',
+        'prv_hier_2',
         'btnumber',
         'prm_util',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'btnumber',
     ).agg(
         spark_funcs.sum('prm_util').alias('util')
@@ -55,7 +57,7 @@ def metric_calc(
 
     util_adj = util.join(
         risk_score,
-        on='elig_status',
+        on=['elig_status','prv_hier_2'],
         how='inner',
     ).join(
         hcc_risk_adj,
@@ -73,20 +75,24 @@ def metric_calc(
 
     metric = util_adj.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit(metric_id).alias('metric_id'),
         'util'
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('util').alias('metric_value')
     ).union(
         util_adj.select(
             'elig_status',
+            'prv_hier_2',
             spark_funcs.lit(metric_id + '_riskadj').alias('metric_id'),
             'util_riskadj',
         ).groupBy(
             'elig_status',
+            'prv_hier_2',
             'metric_id',
         ).agg(
             spark_funcs.sum('util_riskadj').alias('metric_value')
@@ -110,11 +116,13 @@ def metric_calc_ov(
 
     util = outclaims_mcrm.select(
         'elig_status',
+        'prv_hier_2',
         'prm_line',
         'btnumber',
         'prm_util',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'prm_line',
         'btnumber',
     ).agg(
@@ -123,7 +131,7 @@ def metric_calc_ov(
 
     util_adj = util.join(
         risk_score,
-        on='elig_status',
+        on=['elig_status','prv_hier_2'],
         how='inner',
     ).join(
         hcc_risk_adj,
@@ -141,20 +149,24 @@ def metric_calc_ov(
 
     metric = util_adj.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit(metric_id).alias('metric_id'),
         'util'
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('util').alias('metric_value')
     ).union(
         util_adj.select(
             'elig_status',
+            'prv_hier_2',
             spark_funcs.lit(metric_id + '_riskadj').alias('metric_id'),
             'util_riskadj',
         ).groupBy(
             'elig_status',
+            'prv_hier_2',
             'metric_id',
         ).agg(
             spark_funcs.sum('util_riskadj').alias('metric_value')
@@ -175,24 +187,29 @@ def metric_calc_psp(
 
     psp_gen = outclaims_psp.select(
         'elig_status',
+        'prv_hier_2',
         'mr_cases_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
     ).agg(
         spark_funcs.sum('mr_cases_admits').alias('metric_value'),
     )
 
     psp_ind = outclaims_psp.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.col('psp_category').alias('metric_id'),
         'mr_cases_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('mr_cases_admits').alias('metric_value')
     ).select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.concat(
             spark_funcs.lit('psp_procs_'),
             spark_funcs.col('metric_id'),
@@ -202,6 +219,7 @@ def metric_calc_psp(
 
     psps = psp_gen.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('psp_procs').alias('metric_id'),
         'metric_value',
     ).union(
@@ -243,10 +261,12 @@ def main() -> int:
 
     risk_score = member_months.select(
         'elig_status',
+        'prv_hier_2',
         'memmos',
         'risk_score',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
     ).agg(
         spark_funcs.format_number((spark_funcs.sum(spark_funcs.col('memmos')*spark_funcs.col('risk_score')) / spark_funcs.sum(spark_funcs.col('memmos'))), 3).alias('risk_score_avg')
     ).fillna({

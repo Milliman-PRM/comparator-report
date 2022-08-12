@@ -41,10 +41,12 @@ def mr_line_summary(
 
     mr_line_cost = outclaims_mrline.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit(prm_line + '_cost').alias('metric_id'),
         'prm_costs',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_costs').alias('metric_value')
@@ -52,10 +54,12 @@ def mr_line_summary(
 
     mr_line_admits = outclaims_mrline.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit(prm_line + '_admits').alias('metric_id'),
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
@@ -63,10 +67,12 @@ def mr_line_summary(
 
     mr_line_util = outclaims_mrline.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit(prm_line + '_util').alias('metric_id'),
         'prm_util',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_util').alias('metric_value')
@@ -86,6 +92,7 @@ def calc_all_mr_lines(
     """Calculate admits, util, and costs for every individual mr_line"""
     mr_line_costs = outclaims.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.concat(
             spark_funcs.col('prm_line'),
             spark_funcs.lit('_cost')
@@ -93,6 +100,7 @@ def calc_all_mr_lines(
         'prm_costs',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_costs').alias('metric_value')
@@ -100,6 +108,7 @@ def calc_all_mr_lines(
 
     mr_line_admits = outclaims.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.concat(
             spark_funcs.col('prm_line'),
             spark_funcs.lit('_admits')
@@ -107,6 +116,7 @@ def calc_all_mr_lines(
         'prm_admits',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
@@ -114,6 +124,7 @@ def calc_all_mr_lines(
 
     mr_line_util = outclaims.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.concat(
             spark_funcs.col('prm_line'),
             spark_funcs.lit('_util')
@@ -121,6 +132,7 @@ def calc_all_mr_lines(
         'prm_util',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_util').alias('metric_value')

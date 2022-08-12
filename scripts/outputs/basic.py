@@ -46,11 +46,13 @@ def main() -> int:
 
     cnt_assigned_mems = member_months.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('cnt_assigned_mems').alias('metric_id'),
         'member_id',
     ).groupBy(
         'elig_status',
         'metric_id',
+        'prv_hier_2',
     ).agg(
         spark_funcs.countDistinct('member_id').alias('metric_value')
     )
@@ -59,9 +61,11 @@ def main() -> int:
         spark_funcs.lit('All').alias('elig_status'),
         spark_funcs.lit('cnt_assigned_mems').alias('metric_id'),
         'member_id',
+        'prv_hier_2',
     ).groupBy(
         'elig_status',
         'metric_id',
+        'prv_hier_2'
     ).agg(
         spark_funcs.countDistinct('member_id').alias('metric_value')
     )
@@ -72,9 +76,11 @@ def main() -> int:
         spark_funcs.lit('Non-ESRD').alias('elig_status'),
         spark_funcs.lit('cnt_assigned_mems_nonesrd').alias('metric_id'),
         'member_id',
+        'prv_hier_2',
     ).groupBy(
         'elig_status',
         'metric_id',
+        'prv_hier_2',
     ).agg(
         spark_funcs.countDistinct('member_id').alias('metric_value')
     )
@@ -83,9 +89,11 @@ def main() -> int:
         'elig_status',
         spark_funcs.lit('memmos_sum').alias('metric_id'),
         'memmos',
+        'prv_hier_2',
     ).groupBy(
         'elig_status',
         'metric_id',
+        'prv_hier_2',
     ).agg(
         spark_funcs.sum('memmos').alias('metric_value')
     )
@@ -95,9 +103,11 @@ def main() -> int:
         spark_funcs.lit('riskscr_1_avg').alias('metric_id'),
         'memmos',
         'risk_score',
+        'prv_hier_2',
     ).groupBy(
         'elig_status',
         'metric_id',
+        'prv_hier_2',
     ).agg(
         (spark_funcs.sum(spark_funcs.col('memmos') * spark_funcs.col('risk_score')) /
          spark_funcs.sum('memmos')).alias('metric_value'),
@@ -140,10 +150,12 @@ def main() -> int:
 
     all_costs = outclaims_mem.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('prm_costs_sum_all_services').alias('metric_id'),
         'prm_costs',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_costs').alias('metric_value')
@@ -152,6 +164,7 @@ def main() -> int:
     memmos_summary = member_months.groupBy(
         'member_id',
         'elig_status',
+        'prv_hier_2',
     ).agg(
         spark_funcs.sum('memmos').alias('memmos')
     )
@@ -159,11 +172,12 @@ def main() -> int:
     trunc_costs = outclaims_mem.groupBy(
         outclaims.member_id,
         'elig_status',
+        'prv_hier_2',
     ).agg(
         spark_funcs.sum('prm_costs').alias('costs'),
     ).join(
         memmos_summary,
-        on=['member_id', 'elig_status'],
+        on=['member_id', 'elig_status','prv_hier_2'],
         how='left_outer',
     ).withColumn(
         'truncation_threshold',
@@ -185,6 +199,7 @@ def main() -> int:
     ).select(
         'member_id',
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('prm_costs_truncated').alias('metric_id'),
         spark_funcs.when(
             spark_funcs.col('costs') > spark_funcs.col('truncation_threshold'),
@@ -194,6 +209,7 @@ def main() -> int:
         ).alias('costs_truncated')
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum('costs_truncated').alias('metric_value')
@@ -213,11 +229,13 @@ def main() -> int:
 
     total_age = mem_age.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('total_age').alias('metric_id'),
         'memmos',
         'age_month',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum(

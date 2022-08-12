@@ -38,11 +38,13 @@ def nyu_measures(
     """Calculate NYU Metrics by category and Elig Status"""
     metric = outclaims.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit(metric_id).alias('metric_id'),
         'prm_util',
         spark_funcs.col(prm_col).alias('nyu_cat'),
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.sum(spark_funcs.col('prm_util') * spark_funcs.col('nyu_cat')).alias('metric_value')
@@ -86,10 +88,12 @@ def main() -> int:
 
     risk_score = member_months.select(
         'elig_status',
+        'prv_hier_2',
         'memmos',
         'risk_score',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
     ).agg(
         spark_funcs.format_number((spark_funcs.sum(spark_funcs.col('memmos')*spark_funcs.col('risk_score')) / spark_funcs.sum(spark_funcs.col('memmos'))), 2).alias('risk_score_avg')
     )
@@ -230,11 +234,13 @@ def main() -> int:
 
     util = outclaims_mem.select(
         'elig_status',
+        'prv_hier_2',
         'btnumber',
         spark_funcs.lit('ED').alias('metric_id'),
         'prm_util',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'btnumber',
         'metric_id',
     ).agg(
@@ -243,7 +249,7 @@ def main() -> int:
 
     util_riskadj = util.join(
         risk_score,
-        on='elig_status',
+        on=['elig_status','prv_hier_2'],
         how='inner',
     ).join(
         hcc_risk_trim,
@@ -267,11 +273,13 @@ def main() -> int:
 
     er_metrics = util.select(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
         'metric_value',
     ).union(
         util_riskadj.select(
             'elig_status',
+            'prv_hier_2',
             spark_funcs.lit('ED_rskadj').alias('metric_id'),
             spark_funcs.col('util_riskadj').alias('metric_value'),
         )
