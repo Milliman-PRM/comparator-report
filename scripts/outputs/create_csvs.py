@@ -64,13 +64,13 @@ def main() -> int:
         spark_funcs.col('elig_status').isin(NONESRD)
     ).select(
         spark_funcs.lit('Non-ESRD').alias('elig_status'),
-        'metric_id',
         'prv_hier_2',
+        'metric_id',
         'metric_value',
     ).groupBy(
         'elig_status',
-        'metric_id',
         'prv_hier_2',
+        'metric_id',
     ).agg(
         spark_funcs.sum('metric_value').alias('metric_value')
     )

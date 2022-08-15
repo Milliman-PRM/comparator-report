@@ -51,21 +51,21 @@ def main() -> int:
         'member_id',
     ).groupBy(
         'elig_status',
-        'metric_id',
         'prv_hier_2',
+        'metric_id',
     ).agg(
         spark_funcs.countDistinct('member_id').alias('metric_value')
     )
 
     cnt_assigned_mems_all = member_months.select(
         spark_funcs.lit('All').alias('elig_status'),
+        'prv_hier_2',
         spark_funcs.lit('cnt_assigned_mems').alias('metric_id'),
         'member_id',
-        'prv_hier_2',
     ).groupBy(
         'elig_status',
+        'prv_hier_2',
         'metric_id',
-        'prv_hier_2'
     ).agg(
         spark_funcs.countDistinct('member_id').alias('metric_value')
     )
@@ -74,40 +74,41 @@ def main() -> int:
         spark_funcs.col('elig_status') != 'ESRD'
     ).select(
         spark_funcs.lit('Non-ESRD').alias('elig_status'),
+        'prv_hier_2',
         spark_funcs.lit('cnt_assigned_mems_nonesrd').alias('metric_id'),
         'member_id',
-        'prv_hier_2',
     ).groupBy(
         'elig_status',
-        'metric_id',
         'prv_hier_2',
+        'metric_id',
     ).agg(
         spark_funcs.countDistinct('member_id').alias('metric_value')
     )
 
     memmos_sum = member_months.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('memmos_sum').alias('metric_id'),
         'memmos',
-        'prv_hier_2',
     ).groupBy(
         'elig_status',
-        'metric_id',
         'prv_hier_2',
+        'metric_id',
+
     ).agg(
         spark_funcs.sum('memmos').alias('metric_value')
     )
 
     risk_score = member_months.select(
         'elig_status',
+        'prv_hier_2',
         spark_funcs.lit('riskscr_1_avg').alias('metric_id'),
         'memmos',
         'risk_score',
-        'prv_hier_2',
     ).groupBy(
         'elig_status',
-        'metric_id',
         'prv_hier_2',
+        'metric_id',
     ).agg(
         (spark_funcs.sum(spark_funcs.col('memmos') * spark_funcs.col('risk_score')) /
          spark_funcs.sum('memmos')).alias('metric_value'),
