@@ -109,10 +109,13 @@ def main() -> int:
     ).coalesce(10)
 
     pac_drg = dfs_input['pac_drg_summary'].select(
-        spark_funcs.lit(META_SHARED['name_client']).alias('name_client'),
+        spark_funcs.concat(
+            spark_funcs.lit(META_SHARED['name_client']),
+            spark_funcs.lit("-"),
+            spark_funcs.col('prv_hier_2')
+        ).alias('name_client'),
         spark_funcs.lit(time_period).alias('time_period'),
         'elig_status',
-        'prv_hier_2',
         'prm_drg',
         'pac_count',
         'pac_acute_count',
@@ -123,13 +126,21 @@ def main() -> int:
     )
 
     betos_summary = dfs_input['betos'].select(
-        spark_funcs.lit(META_SHARED['name_client']).alias('name_client'),
+        spark_funcs.concat(
+            spark_funcs.lit(META_SHARED['name_client']),
+            spark_funcs.lit("-"),
+            spark_funcs.col('prv_hier_2')
+        ).alias('name_client'),
         spark_funcs.lit(time_period).alias('time_period'),
         '*',
     )
 
     truncation_summary = dfs_input['truncation'].select(
-        spark_funcs.lit(META_SHARED['name_client']).alias('name_client'),
+        spark_funcs.concat(
+            spark_funcs.lit(META_SHARED['name_client']),
+            spark_funcs.lit("-"),
+            spark_funcs.col('prv_hier_2')
+        ).alias('name_client'),
         spark_funcs.lit(time_period).alias('time_period'),
         '*',
     )
