@@ -78,6 +78,7 @@ def truncation_summary(
     distinct_ime_dsh_ucc = outclaims_mem.select(
         'member_id',
         'elig_status',
+        'prv_hier_2',
         'claimid',
         'ime_sum',
         'dsh_sum',
@@ -105,6 +106,7 @@ def truncation_summary(
     ime_dsh_ucc_summary = distinct_ime_dsh_ucc.groupBy(
         'member_id',
         'elig_status',
+        'prv_hier_2',
     ).agg(
         *[
             spark_funcs.sum(ime_dsh_ucc).alias(ime_dsh_ucc.replace('sum', 'costs'))
@@ -115,6 +117,7 @@ def truncation_summary(
     cost_summary = outclaims_mem.groupBy(
         'member_id',
         'elig_status',
+        'prv_hier_2',
     ).agg(
         spark_funcs.sum('prm_costs').alias('costs'),
         spark_funcs.sum(
@@ -138,17 +141,18 @@ def truncation_summary(
     memmos_summary = member_months.groupBy(
         'member_id',
         'elig_status'
+        'prv_hier_2',
     ).agg(
         spark_funcs.sum('memmos').alias('memmos')
     )
 
     mem_all_costs = memmos_summary.join(
         cost_summary,
-        on=['member_id', 'elig_status'],
+        on=['member_id', 'elig_status','prv_hier_2'],
         how='left_outer',
     ).join(
         ime_dsh_ucc_summary,
-        on=['member_id', 'elig_status'],
+        on=['member_id', 'elig_status','prv_hier_2'],
         how='left_outer',
     ).fillna({
         col: 0
@@ -189,11 +193,12 @@ def truncation_summary(
 
     truncation_summary = mem_all_costs.groupBy(
         'elig_status',
+		'prv_hier_2',
         spark_funcs.lit(to_from_dt).alias('date_flag'),
     ).agg(
         *[
             spark_funcs.sum(col).alias(col)
-            for col in mem_all_costs.columns if col not in ['member_id', 'elig_status', 'truncation_threshold']
+            for col in mem_all_costs.columns if col not in ['member_id', 'elig_status', 'prv_hier_2', 'truncation_threshold']
         ]
     )
 
