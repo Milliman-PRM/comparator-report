@@ -74,13 +74,14 @@ def main() -> int:
         dfs_input['providers'],
         on=dfs_input['member_time_windows'].mem_prv_id_align == dfs_input['providers'].prv_id,   
         how='left'
+    ).withColumn("prv_hier_2",spark_funcs.coalesce(spark_funcs.col("prv_hier_2"),spark_funcs.lit("Unknown"))
     ).groupBy(
         'member_id',
         'elig_month',
         'prv_hier_2'
     ).agg(
         spark_funcs.sum('memmos_medical').alias('memmos')
-    ).withColumn("prv_hier_2",spark_funcs.coalesce(spark_funcs.col("prv_hier_2"),spark_funcs.lit("Unknown")))
+    )
 
     recent_info_window = Window().partitionBy(
         'member_id',
@@ -96,6 +97,7 @@ def main() -> int:
         dfs_input['providers'],
         on=dfs_input['member_time_windows'].mem_prv_id_align == dfs_input['providers'].prv_id,   
         how='left'
+    ).withColumn("prv_hier_2",spark_funcs.coalesce(spark_funcs.col("prv_hier_2"),spark_funcs.lit("Unknown"))
     ).select(
         '*',
         spark_funcs.row_number().over(recent_info_window).alias('order'),
