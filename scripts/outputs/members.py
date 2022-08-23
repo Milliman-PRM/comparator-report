@@ -80,7 +80,7 @@ def main() -> int:
         'prv_hier_2'
     ).agg(
         spark_funcs.sum('memmos_medical').alias('memmos')
-    )
+    ).withColumn("prv_hier_2",spark_funcs.coalesce(spark_funcs.col("prv_hier_2"),spark_funcs.lit("Unknown")))
 
     recent_info_window = Window().partitionBy(
         'member_id',
