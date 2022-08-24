@@ -140,7 +140,7 @@ def truncation_summary(
     
     memmos_summary = member_months.groupBy(
         'member_id',
-        'elig_status'
+        'elig_status',
         'prv_hier_2',
     ).agg(
         spark_funcs.sum('memmos').alias('memmos')
