@@ -77,7 +77,7 @@ def main() -> int:
             1
         )
 
-    member_months = dfs_input['member_months']
+    member_months = dfs_input['member_months'].where(spark_funcs.col("memmos")!=0.0)
 
     mem_elig_distinct = member_months.select(
         'member_id',
