@@ -210,6 +210,26 @@ def metric_calc_psp(
 
     return psps
 
+def metric_calc_rx(
+        outpharmacy: "DataFrame",
+    ) -> "DataFrame":
+    """Pharmacymetric calculation"""
+    rx_cost = outpharmacy.select(
+        'elig_status',
+        'allowed',
+        'memmos'
+    ).groupBy(
+        'elig_status',
+    ).agg(
+        spark_funcs.sum('allowed').alias('metric_value'),
+    ).select(
+        'elig_status',
+        spark_funcs.lit('rx_allowed').alias('metric_id'),    
+        'metric_value',
+    )
+
+    return rx_cost
+
 def main() -> int:
     """Pass outclaims through to outpatient metric calculation functions"""
     sparkapp = SparkApp(META_SHARED['pipeline_signature'])
@@ -220,6 +240,7 @@ def main() -> int:
             PATH_OUTPUTS / 'member_months.parquet',
             PATH_INPUTS / 'member_time_windows.parquet',
             PATH_INPUTS / 'outclaims.parquet',
+            PATH_INPUTS / 'outpharmacy.parquet',
             PATH_REF / 'ref_link_hcg_researcher_line.parquet',
             PATH_REF / 'ref_hcg_bt.parquet',            
         ]
@@ -281,6 +302,27 @@ def main() -> int:
         mr_line_map,
         on=(outclaims.prm_line == mr_line_map.researcherline),
         how='left_outer',
+    )
+
+    outpharmacy = dfs_input['outpharmacy'].withColumn(
+        'month',
+        date_as_month(spark_funcs.col('prm_fromdate'))
+    )    
+    outpharmacy_mem = outpharmacy.join(
+        elig_memmos,
+        on=[
+            outpharmacy.member_id == elig_memmos.member_id,
+            spark_funcs.col('prm_fromdate').between(
+                spark_funcs.col('date_start'),
+                spark_funcs.col('date_end'),
+            )
+            ],
+        how='inner',
+    ).join(
+        member_months,
+        on=(outpharmacy.member_id == member_months.member_id)
+        & (outpharmacy.month == member_months.elig_month),
+        how='inner'
     )
 
     hcc_risk_trim = dfs_input['ref_hcg_bt'].where(
@@ -384,6 +426,7 @@ def main() -> int:
     urg_care = metric_calc(outclaims_mem, risk_score, hcc_risk_trim, 'P33', 'urgent_care_prof')
     office_vis = metric_calc_ov(outclaims_mem, risk_score, hcc_risk_trim, 'office_visits')
     pref_sens = metric_calc_psp(outclaims_mem)
+    rx_costs = metric_calc_rx(outpharmacy_mem)
 
     outpatient_metrics = hi_tec_img.union(
         obs_stays
@@ -397,6 +440,8 @@ def main() -> int:
         office_vis
     ).union(
         pref_sens
+    ).union(
+        rx_costs        
     ).coalesce(10)
 
     sparkapp.save_df(
