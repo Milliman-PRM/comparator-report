@@ -148,6 +148,17 @@ def main() -> int:
     ).agg(
         spark_funcs.sum('prm_costs').alias('metric_value')
     )
+    
+    all_allowed = outclaims_mem.select(
+        'elig_status',
+        spark_funcs.lit('allowed_sum_all_services').alias('metric_id'),
+        'allowed',
+    ).groupBy(
+        'elig_status',
+        'metric_id',
+    ).agg(
+        spark_funcs.sum('allowed').alias('metric_value')
+    )
 
     memmos_summary = member_months.groupBy(
         'member_id',
@@ -299,6 +310,8 @@ def main() -> int:
         risk_score
     ).union(
         all_costs
+    ).union(
+        all_allowed
     ).union(
         trunc_costs
     ).union(
