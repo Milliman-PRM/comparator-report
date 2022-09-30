@@ -216,12 +216,12 @@ def metric_calc_rx(
     """Pharmacymetric calculation"""
     rx_cost = outpharmacy.select(
         'elig_status',
-        'allowed',
+        'prm_costs',
         'memmos'
     ).groupBy(
         'elig_status',
     ).agg(
-        spark_funcs.sum('allowed').alias('metric_value'),
+        spark_funcs.sum('prm_costs').alias('metric_value'),
     ).select(
         'elig_status',
         spark_funcs.lit('rx_allowed').alias('metric_id'),    
