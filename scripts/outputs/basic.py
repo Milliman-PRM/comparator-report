@@ -21,7 +21,7 @@ NAME_MODULE = 'outputs'
 PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
 PATH_RS = META_SHARED['path_data_nyhealth_shared'] / 'risk_scores'
 PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
-
+WELLNESS_HCPCS = ["G0402", "G0438", "G0439", "G0468"]
 RUNOUT = 3
 
 # =============================================================================
@@ -236,6 +236,60 @@ def main() -> int:
             * spark_funcs.col('age_month')
         ).alias('metric_value'),
     )
+    
+    wellness_visits = outclaims.where(
+        spark_funcs.col("hcpcs").isin(WELLNESS_HCPCS)
+    ).select("member_id", "prm_fromdate")
+
+    wellness_window = Window.partitionBy("member_id", "elig_month").orderBy(
+        spark_funcs.desc("prm_fromdate")
+    )
+
+    elig_month_window = Window.partitionBy("member_id").orderBy(
+        spark_funcs.desc("elig_month")
+    )
+
+    recent_wellness_visit = (
+        member_months.join(wellness_visits, on="member_id", how="inner")
+        .where(spark_funcs.col("prm_fromdate") <= spark_funcs.last_day("elig_month"))
+        .withColumn("row_rank", spark_funcs.row_number().over(wellness_window))
+        .withColumn("elig_row_rank", spark_funcs.row_number().over(elig_month_window))
+        .withColumn(
+            "tag",
+            spark_funcs.when(
+                spark_funcs.add_months(spark_funcs.col("elig_month"), -12)
+                <= spark_funcs.col("prm_fromdate"),
+                1,
+            ).otherwise(0),
+        )
+        .where(
+            (spark_funcs.col("row_rank") == 1) & (spark_funcs.col("elig_row_rank") == 1)
+        )
+    )
+
+    cnt_wellness_visits = (
+        recent_wellness_visit.select(
+            "elig_status",
+            spark_funcs.lit("cnt_wellness_visits").alias("metric_id"),
+            recent_wellness_visit.member_id,
+            "tag",
+        )
+        .groupBy("elig_status", "metric_id")
+        .agg(spark_funcs.sum("tag").alias("metric_value"))
+    )
+
+    cnt_wellness_visits_all = cnt_wellness_visits.select(
+        spark_funcs.lit("All").alias("elig_status"),
+        spark_funcs.lit("cnt_wellness_visits").alias("metric_id"),
+        spark_funcs.sum("metric_value").alias("metric_value"),
+    )
+    cnt_wellness_visits_nonesrd = cnt_wellness_visits.where(
+        spark_funcs.col("elig_status") != "ESRD"
+    ).select(
+        spark_funcs.lit("Non-ESRD").alias("elig_status"),
+        spark_funcs.lit("cnt_wellness_visits").alias("metric_id"),
+        spark_funcs.sum("metric_value").alias("metric_value"),
+    )
 
     basic_metrics = cnt_assigned_mems.union(
         assigned_nonesrd
@@ -253,6 +307,12 @@ def main() -> int:
         total_age
     ).union(
         cnt_assigned_mems_all
+    ).union(
+        cnt_wellness_visits
+    ).union(
+        cnt_wellness_visits_all
+    ).union(
+        cnt_wellness_visits_nonesrd
     ).coalesce(10)
 
     sparkapp.save_df(
