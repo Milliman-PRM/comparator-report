@@ -224,7 +224,7 @@ def metric_calc_rx(
         spark_funcs.sum('prm_costs').alias('metric_value'),
     ).select(
         'elig_status',
-        spark_funcs.lit('rx_allowed').alias('metric_id'),    
+        spark_funcs.lit('rx_paid').alias('metric_id'),    
         'metric_value',
     )
 
