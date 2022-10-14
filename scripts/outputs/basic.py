@@ -13,7 +13,7 @@ from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
 from prm.dates.utils import date_as_month
 import comparator_report.meta.project
-
+from pyspark.sql import Column, Window
 LOGGER = logging.getLogger(__name__)
 META_SHARED = comparator_report.meta.project.gather_metadata()
 
