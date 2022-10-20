@@ -1,6 +1,9 @@
 ## Release Notes
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
+### v1.11.4
+  - Add annual wellness visit count into comparator metrics
+
 ### v1.11.3
   - Fix the issue of counting decedents
   
