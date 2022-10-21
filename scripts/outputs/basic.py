@@ -246,8 +246,8 @@ def main() -> int:
         .withColumn(
             "tag",
             spark_funcs.when(
-                spark_funcs.add_months(spark_funcs.col("elig_month"), -12)
-                <= spark_funcs.col("prm_fromdate"),
+                spark_funcs.add_months(spark_funcs.col("elig_month"), -11)
+                <= spark_funcs.first_day("prm_fromdate"),
                 1,
             ).otherwise(0),
         )
