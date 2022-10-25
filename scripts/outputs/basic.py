@@ -42,7 +42,7 @@ def main() -> int:
         ]
     }
 
-    member_months = dfs_input['member_months']
+    member_months = dfs_input['member_months'].where(spark_funcs.col('cover_medical') == 'Y')
 
     cnt_assigned_mems = member_months.select(
         'elig_status',
