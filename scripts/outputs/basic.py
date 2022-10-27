@@ -260,8 +260,8 @@ def main() -> int:
         .where
             (spark_funcs.col("row_rank") == 1)
     )
-	
-	max_date = recent_wellness_visit.agg({"elig_month": "max"}).collect()[0][0]
+    
+    max_date = recent_wellness_visit.agg({"elig_month": "max"}).collect()[0][0]
     recent_wellness_visit = recent_wellness_visit.where(
         spark_funcs.col("elig_month") == max_date
     )
