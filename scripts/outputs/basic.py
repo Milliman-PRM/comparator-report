@@ -245,15 +245,10 @@ def main() -> int:
         spark_funcs.desc("prm_fromdate")
     )
 
-    elig_month_window = Window.partitionBy("member_id").orderBy(
-        spark_funcs.desc("elig_month")
-    )
-
     recent_wellness_visit = (
         member_months.join(wellness_visits, on="member_id", how="inner")
         .where(spark_funcs.col("prm_fromdate") <= spark_funcs.last_day("elig_month"))
         .withColumn("row_rank", spark_funcs.row_number().over(wellness_window))
-        .withColumn("elig_row_rank", spark_funcs.row_number().over(elig_month_window))
         .withColumn(
             "tag",
             spark_funcs.when(
@@ -262,9 +257,13 @@ def main() -> int:
                 1,
             ).otherwise(0),
         )
-        .where(
-            (spark_funcs.col("row_rank") == 1) & (spark_funcs.col("elig_row_rank") == 1)
-        )
+        .where
+            (spark_funcs.col("row_rank") == 1)
+    )
+	
+	max_date = recent_wellness_visit.agg({"elig_month": "max"}).collect()[0][0]
+    recent_wellness_visit = recent_wellness_visit.where(
+        spark_funcs.col("elig_month") == max_date
     )
 
     cnt_wellness_visits = (
