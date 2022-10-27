@@ -282,13 +282,6 @@ def main() -> int:
         spark_funcs.lit("cnt_wellness_visits").alias("metric_id"),
         spark_funcs.sum("metric_value").alias("metric_value"),
     )
-    cnt_wellness_visits_nonesrd = cnt_wellness_visits.where(
-        spark_funcs.col("elig_status") != "ESRD"
-    ).select(
-        spark_funcs.lit("Non-ESRD").alias("elig_status"),
-        spark_funcs.lit("cnt_wellness_visits").alias("metric_id"),
-        spark_funcs.sum("metric_value").alias("metric_value"),
-    )
 
     basic_metrics = cnt_assigned_mems.union(
         assigned_nonesrd
@@ -310,8 +303,6 @@ def main() -> int:
         cnt_wellness_visits
     ).union(
         cnt_wellness_visits_all
-    ).union(
-        cnt_wellness_visits_nonesrd
     ).coalesce(10)
 
     sparkapp.save_df(
