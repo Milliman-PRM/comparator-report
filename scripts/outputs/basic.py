@@ -250,12 +250,12 @@ def main() -> int:
             (spark_funcs.col("row_rank") == 1)
     )
 
-    max_date = recent_wellness_visit.agg({"elig_month": "max"}).collect()[0][0]
+    max_date = recent_wellness_visit.select(spark_funcs.max("elig_month")).collect()[0][0]
     recent_wellness_visit = recent_wellness_visit.where(
         spark_funcs.col("elig_month") == max_date
     )
-
-    cnt_wellness_visits = (
+    
+    cnt_wellness_visits_numer = (
         recent_wellness_visit.select(
             "elig_status",
             spark_funcs.lit("cnt_wellness_visits").alias("metric_id"),
@@ -266,12 +266,31 @@ def main() -> int:
         .agg(spark_funcs.sum("tag").alias("metric_value"))
     )
 
-    cnt_wellness_visits_all = cnt_wellness_visits.select(
+    cnt_wellness_visits_numer_all = cnt_wellness_visits_numer.select(
         spark_funcs.lit("All").alias("elig_status"),
         spark_funcs.lit("cnt_wellness_visits").alias("metric_id"),
         spark_funcs.sum("metric_value").alias("metric_value"),
     )
+    
+    cnt_wellness_visits_denom = member_months.where(
+        spark_funcs.col("elig_month") == max_date
+    ).select(
+        'elig_status',
+        spark_funcs.lit('cnt_wellness_visits_denom').alias('metric_id'),
+        'member_id',
+    ).groupBy(
+        'elig_status',
+        'metric_id',
+    ).agg(
+        spark_funcs.countDistinct('member_id').alias('metric_value')
+    )    
 
+    cnt_wellness_visits_denom_all = cnt_wellness_visits_denom.select(
+        spark_funcs.lit("All").alias("elig_status"),
+        spark_funcs.lit("cnt_wellness_visits_denom").alias("metric_id"),
+        spark_funcs.sum("metric_value").alias("metric_value"),
+    )
+    
     basic_metrics = cnt_assigned_mems.union(
         assigned_nonesrd
     ).union(
@@ -287,9 +306,13 @@ def main() -> int:
     ).union(
         cnt_assigned_mems_all
     ).union(
-        cnt_wellness_visits
+        cnt_wellness_visits_numer
     ).union(
-        cnt_wellness_visits_all
+        cnt_wellness_visits_numer_all
+    ).union(
+        cnt_wellness_visits_denom
+    ).union(
+        cnt_wellness_visits_denom_all
     ).coalesce(10)
 
     sparkapp.save_df(
