@@ -13,7 +13,7 @@ from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
 from prm.dates.utils import date_as_month
 import comparator_report.meta.project
-
+from pyspark.sql import Window
 LOGGER = logging.getLogger(__name__)
 META_SHARED = comparator_report.meta.project.gather_metadata()
 
@@ -21,7 +21,7 @@ NAME_MODULE = 'outputs'
 PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
 PATH_RS = META_SHARED['path_data_nyhealth_shared'] / 'risk_scores'
 PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
-
+WELLNESS_HCPCS = ["G0402", "G0438", "G0439", "G0468"]
 RUNOUT = 3
 
 # =============================================================================
@@ -42,7 +42,7 @@ def main() -> int:
         ]
     }
 
-    member_months = dfs_input['member_months']
+    member_months = dfs_input['member_months'].where(spark_funcs.col('cover_medical') == 'Y')
 
     cnt_assigned_mems = member_months.select(
         'elig_status',
@@ -244,6 +244,88 @@ def main() -> int:
             * spark_funcs.col('age_month')
         ).alias('metric_value'),
     )
+	
+    wellness_visits = outclaims.where(
+        spark_funcs.col("hcpcs").isin(WELLNESS_HCPCS)
+    ).select("member_id", "prm_fromdate")
+
+    wellness_window = Window.partitionBy("member_id", "elig_month").orderBy(
+        spark_funcs.desc("prm_fromdate")
+    )
+
+    recent_wellness_visit = (
+        member_months.join(wellness_visits, on="member_id", how="inner")
+        .where(spark_funcs.col("prm_fromdate") <= spark_funcs.last_day("elig_month"))
+        .withColumn("row_rank", spark_funcs.row_number().over(wellness_window))
+        .withColumn(
+            "tag",
+            spark_funcs.when(
+                spark_funcs.add_months(spark_funcs.trunc("elig_month","month"), -11)
+                <= spark_funcs.col("prm_fromdate"),
+                1,
+            ).otherwise(0),
+        )
+        .where
+            (spark_funcs.col("row_rank") == 1)
+    )
+
+    max_date = recent_wellness_visit.select(spark_funcs.max("elig_month")).collect()[0][0]
+    recent_wellness_visit = recent_wellness_visit.where(
+        spark_funcs.col("elig_month") == max_date
+    )
+    
+    cnt_wellness_visits_numer = (
+        recent_wellness_visit.select(
+            "elig_status",
+			"prv_hier_2",
+            spark_funcs.lit("cnt_wellness_visits_numer").alias("metric_id"),
+            recent_wellness_visit.member_id,
+            "tag",
+        )
+        .groupBy("elig_status", "prv_hier_2","metric_id")
+        .agg(spark_funcs.sum("tag").alias("metric_value"))
+    )
+
+    cnt_wellness_visits_numer_all = cnt_wellness_visits_numer.select(
+        spark_funcs.lit('All').alias('elig_status'),
+        'prv_hier_2',
+        spark_funcs.lit('cnt_wellness_visits_numer').alias('metric_id'),
+        'member_id',
+    ).groupBy(
+        'elig_status',
+        'prv_hier_2',
+        'metric_id',
+    ).agg(
+        spark_funcs.sum("metric_value").alias('metric_value')
+    )	
+	
+    cnt_wellness_visits_denom = member_months.where(
+        spark_funcs.col("elig_month") == max_date
+    ).select(
+        'elig_status',
+		'prv_hier_2',
+        spark_funcs.lit('cnt_wellness_visits_denom').alias('metric_id'),
+        'member_id',
+    ).groupBy(
+        'elig_status',
+		'prv_hier_2',
+        'metric_id',
+    ).agg(
+        spark_funcs.countDistinct('member_id').alias('metric_value')
+    )    
+
+    cnt_wellness_visits_denom_all = cnt_wellness_visits_denom.select(
+        spark_funcs.lit('All').alias('elig_status'),
+        'prv_hier_2',
+        spark_funcs.lit('cnt_wellness_visits_denom').alias('metric_id'),
+        'member_id',
+    ).groupBy(
+        'elig_status',
+        'prv_hier_2',
+        'metric_id',
+    ).agg(
+        spark_funcs.sum("metric_value").alias('metric_value')
+    )	
 
     basic_metrics = cnt_assigned_mems.union(
         assigned_nonesrd
@@ -259,6 +341,14 @@ def main() -> int:
         total_age
     ).union(
         cnt_assigned_mems_all
+    ).union(
+        cnt_wellness_visits_numer
+    ).union(
+        cnt_wellness_visits_numer_all
+    ).union(
+        cnt_wellness_visits_denom
+    ).union(
+        cnt_wellness_visits_denom_all
     ).coalesce(10)
 
     sparkapp.save_df(
