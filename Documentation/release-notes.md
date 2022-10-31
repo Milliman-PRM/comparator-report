@@ -2,7 +2,8 @@
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
 ### v1.11.4
-  - Add annual wellness visit count into comparator metrics
+  - Add annual wellness visit denominator and numerator into comparator metrics
+  - remove members that have no member months in the basics scripts
 
 ### v1.11.3
   - Fix the issue of counting decedents

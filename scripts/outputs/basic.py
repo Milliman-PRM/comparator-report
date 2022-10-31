@@ -258,7 +258,7 @@ def main() -> int:
     cnt_wellness_visits_numer = (
         recent_wellness_visit.select(
             "elig_status",
-            spark_funcs.lit("cnt_wellness_visits").alias("metric_id"),
+            spark_funcs.lit("cnt_wellness_visits_numer").alias("metric_id"),
             recent_wellness_visit.member_id,
             "tag",
         )
@@ -268,7 +268,7 @@ def main() -> int:
 
     cnt_wellness_visits_numer_all = cnt_wellness_visits_numer.select(
         spark_funcs.lit("All").alias("elig_status"),
-        spark_funcs.lit("cnt_wellness_visits").alias("metric_id"),
+        spark_funcs.lit("cnt_wellness_visits_numer").alias("metric_id"),
         spark_funcs.sum("metric_value").alias("metric_value"),
     )
     
