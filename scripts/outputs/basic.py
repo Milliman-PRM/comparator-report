@@ -290,7 +290,7 @@ def main() -> int:
         spark_funcs.lit('All').alias('elig_status'),
         'prv_hier_2',
         spark_funcs.lit('cnt_wellness_visits_numer').alias('metric_id'),
-        'member_id',
+        'metric_value',
     ).groupBy(
         'elig_status',
         'prv_hier_2',
@@ -318,7 +318,7 @@ def main() -> int:
         spark_funcs.lit('All').alias('elig_status'),
         'prv_hier_2',
         spark_funcs.lit('cnt_wellness_visits_denom').alias('metric_id'),
-        'member_id',
+        'metric_value',
     ).groupBy(
         'elig_status',
         'prv_hier_2',
