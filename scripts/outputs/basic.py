@@ -244,7 +244,7 @@ def main() -> int:
             * spark_funcs.col('age_month')
         ).alias('metric_value'),
     )
-	
+
     wellness_visits = outclaims.where(
         spark_funcs.col("hcpcs").isin(WELLNESS_HCPCS)
     ).select("member_id", "prm_fromdate")
@@ -273,11 +273,11 @@ def main() -> int:
     recent_wellness_visit = recent_wellness_visit.where(
         spark_funcs.col("elig_month") == max_date
     )
-    
+
     cnt_wellness_visits_numer = (
         recent_wellness_visit.select(
             "elig_status",
-			"prv_hier_2",
+            "prv_hier_2",
             spark_funcs.lit("cnt_wellness_visits_numer").alias("metric_id"),
             recent_wellness_visit.member_id,
             "tag",
@@ -297,22 +297,22 @@ def main() -> int:
         'metric_id',
     ).agg(
         spark_funcs.sum("metric_value").alias('metric_value')
-    )	
-	
+    )
+
     cnt_wellness_visits_denom = member_months.where(
         spark_funcs.col("elig_month") == max_date
     ).select(
         'elig_status',
-		'prv_hier_2',
+        'prv_hier_2',
         spark_funcs.lit('cnt_wellness_visits_denom').alias('metric_id'),
         'member_id',
     ).groupBy(
         'elig_status',
-		'prv_hier_2',
+        'prv_hier_2',
         'metric_id',
     ).agg(
         spark_funcs.countDistinct('member_id').alias('metric_value')
-    )    
+    )
 
     cnt_wellness_visits_denom_all = cnt_wellness_visits_denom.select(
         spark_funcs.lit('All').alias('elig_status'),
@@ -325,7 +325,7 @@ def main() -> int:
         'metric_id',
     ).agg(
         spark_funcs.sum("metric_value").alias('metric_value')
-    )	
+    )
 
     basic_metrics = cnt_assigned_mems.union(
         assigned_nonesrd
