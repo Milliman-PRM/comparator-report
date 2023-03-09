@@ -218,7 +218,7 @@ def main() -> int:
         spark_funcs.col('reporting_date_start').alias('min_incurred_date'),
         spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
     ).collect()[0]
-
+    max_incurred_date = max_incurred_date + timedelta(days=7)
     qexpu_runout_7 = max_incurred_date + timedelta(days=7)
     qexpu_runout_14 = max_incurred_date + timedelta(days=14)
 
