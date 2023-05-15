@@ -275,64 +275,6 @@ def main() -> int:
         spark_funcs.sum("metric_value").alias("metric_value"),
     )
 
-    outclaims_mem_followup_visits = outclaims_mem.withColumn(
-        "cnt_followup_visits_within_7_days_numer_yn",
-        spark_funcs.when(
-            spark_funcs.col("followup_visit_within_7_days_numer_yn") == "Y",
-            spark_funcs.lit(1),
-        ).otherwise(spark_funcs.lit(0)),
-    ).withColumn(
-        "cnt_followup_visit_within_7_days_denom_yn",
-        spark_funcs.when(
-            spark_funcs.col("followup_visit_within_7_days_denom_yn") == "Y",
-            spark_funcs.lit(1),
-        ).otherwise(spark_funcs.lit(0)),
-    )
-
-    cnt_followup_visits_within_7_days_numer = (
-        outclaims_mem_followup_visits.select(
-            "elig_status",
-            spark_funcs.lit("cnt_followup_visits_within_7_days_numer").alias(
-                "metric_id"
-            ),
-            "cnt_followup_visits_within_7_days_numer_yn",
-        )
-        .groupBy("elig_status", "metric_id")
-        .agg(
-            spark_funcs.sum("cnt_followup_visits_within_7_days_numer_yn").alias(
-                "metric_value"
-            )
-        )
-    )
-
-    cnt_followup_visits_within_7_days_denom = (
-        outclaims_mem_followup_visits.select(
-            "elig_status",
-            spark_funcs.lit("cnt_followup_visits_within_7_days_denom").alias(
-                "metric_id"
-            ),
-            "cnt_followup_visit_within_7_days_denom_yn",
-        )
-        .groupBy("elig_status", "metric_id")
-        .agg(
-            spark_funcs.sum("cnt_followup_visit_within_7_days_denom_yn").alias(
-                "metric_value"
-            )
-        )
-    )
-
-    cnt_followup_visits_within_7_days_numer_all = cnt_followup_visits_within_7_days_numer.select(
-        spark_funcs.lit("All").alias("elig_status"),
-        spark_funcs.lit("cnt_followup_visits_within_7_days_numer").alias("metric_id"),
-        spark_funcs.sum("metric_value").alias("metric_value"),
-    )
-
-    cnt_followup_visits_within_7_days_denom_all = cnt_followup_visits_within_7_days_denom.select(
-        spark_funcs.lit("All").alias("elig_status"),
-        spark_funcs.lit("cnt_followup_visits_within_7_days_denom").alias("metric_id"),
-        spark_funcs.sum("metric_value").alias("metric_value"),
-    )
-
     basic_metrics = (
         cnt_assigned_mems.union(assigned_nonesrd)
         .union(memmos_sum)
@@ -345,10 +287,6 @@ def main() -> int:
         .union(cnt_wellness_visits_numer_all)
         .union(cnt_wellness_visits_denom)
         .union(cnt_wellness_visits_denom_all)
-        .union(cnt_followup_visits_within_7_days_numer)
-        .union(cnt_followup_visits_within_7_days_numer_all)
-        .union(cnt_followup_visits_within_7_days_denom)
-        .union(cnt_followup_visits_within_7_days_denom_all)
         .coalesce(10)
     )
 
