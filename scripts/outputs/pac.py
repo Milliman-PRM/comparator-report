@@ -95,7 +95,7 @@ def calc_pac_episode_flags(outclaims_with_case_decor: "DataFrame") -> "DataFrame
 
 def calc_pac_metrics(outclaims: "DataFrame") -> "DataFrame":
     """Calculate metrics using flags calculated in calc_pac_episode_flags"""
-    outclaims_pac = pac_flags_trim.where(spark_funcs.col("pac_index_yn") == "Y")
+    outclaims_pac = outclaims.where(spark_funcs.col("pac_index_yn") == "Y")
 
     pac_count = (
         outclaims_pac.select(
