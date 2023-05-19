@@ -154,33 +154,21 @@ def calc_pac_metrics(outclaims: "DataFrame") -> "DataFrame":
         .agg(spark_funcs.sum("prm_admits").alias("metric_value"))
     )
 
-    pac_followup_visits_med = outclaims_pac.withColumn(
-        "cnt_followup_visits_within_7_days_numer_yn",
-        spark_funcs.when(
-            (
-                (spark_funcs.col("followup_visit_within_7_days_numer_yn") == "Y")
-                & (spark_funcs.col("prm_line") == "I11a")
-            ),
-            spark_funcs.lit(1),
-        ).otherwise(spark_funcs.lit(0)),
-    ).withColumn(
-        "cnt_followup_visit_within_7_days_denom_yn",
-        spark_funcs.when(
-            (
-                (spark_funcs.col("followup_visit_within_7_days_denom_yn") == "Y")
-                & (spark_funcs.col("prm_line") == "I11a")
-            ),
-            spark_funcs.lit(1),
-        ).otherwise(spark_funcs.lit(0)),
-    )
-
     pac_followup_visits_within_7_days_numer_med = (
-        pac_followup_visits_med.select(
+        outclaims_pac.select(
             "elig_status",
             spark_funcs.lit("cnt_followup_visits_within_7_days_numer_med").alias(
                 "metric_id"
             ),
-            "cnt_followup_visits_within_7_days_numer_yn",
+            spark_funcs.when(
+                (
+                    (spark_funcs.col("followup_visit_within_7_days_numer_yn") == "Y")
+                    & (spark_funcs.col("prm_line") == "I11a")
+                ),
+                spark_funcs.lit(1),
+            )
+            .otherwise(spark_funcs.lit(0))
+            .alias("cnt_followup_visits_within_7_days_numer_yn"),
         )
         .groupBy("elig_status", "metric_id")
         .agg(
@@ -191,48 +179,44 @@ def calc_pac_metrics(outclaims: "DataFrame") -> "DataFrame":
     )
 
     pac_followup_visits_within_7_days_denom_med = (
-        pac_followup_visits_med.select(
+        outclaims_pac.select(
             "elig_status",
             spark_funcs.lit("cnt_followup_visits_within_7_days_denom_med").alias(
                 "metric_id"
             ),
-            "cnt_followup_visit_within_7_days_denom_yn",
+            spark_funcs.when(
+                (
+                    (spark_funcs.col("followup_visit_within_7_days_denom_yn") == "Y")
+                    & (spark_funcs.col("prm_line") == "I11a")
+                ),
+                spark_funcs.lit(1),
+            )
+            .otherwise(spark_funcs.lit(0))
+            .alias("cnt_followup_visits_within_7_days_denom_yn"),
         )
         .groupBy("elig_status", "metric_id")
         .agg(
-            spark_funcs.sum("cnt_followup_visit_within_7_days_denom_yn").alias(
+            spark_funcs.sum("cnt_followup_visits_within_7_days_denom_yn").alias(
                 "metric_value"
             )
         )
     )
 
-    outclaims_pac_followup_visits_sur = outclaims_pac.withColumn(
-        "cnt_followup_visits_within_7_days_numer_yn",
-        spark_funcs.when(
-            (
-                (spark_funcs.col("followup_visit_within_7_days_numer_yn") == "Y")
-                & (spark_funcs.col("prm_line") == "I12")
-            ),
-            spark_funcs.lit(1),
-        ).otherwise(spark_funcs.lit(0)),
-    ).withColumn(
-        "cnt_followup_visit_within_7_days_denom_yn",
-        spark_funcs.when(
-            (
-                (spark_funcs.col("followup_visit_within_7_days_denom_yn") == "Y")
-                & (spark_funcs.col("prm_line") == "I12")
-            ),
-            spark_funcs.lit(1),
-        ).otherwise(spark_funcs.lit(0)),
-    )
-
     pac_followup_visits_within_7_days_numer_sur = (
-        outclaims_pac_followup_visits_sur.select(
+        outclaims_pac.select(
             "elig_status",
             spark_funcs.lit("cnt_followup_visits_within_7_days_numer_sur").alias(
                 "metric_id"
             ),
-            "cnt_followup_visits_within_7_days_numer_yn",
+            spark_funcs.when(
+                (
+                    (spark_funcs.col("followup_visit_within_7_days_numer_yn") == "Y")
+                    & (spark_funcs.col("prm_line") == "I12")
+                ),
+                spark_funcs.lit(1),
+            )
+            .otherwise(spark_funcs.lit(0))
+            .alias("cnt_followup_visits_within_7_days_numer_yn"),
         )
         .groupBy("elig_status", "metric_id")
         .agg(
@@ -243,16 +227,24 @@ def calc_pac_metrics(outclaims: "DataFrame") -> "DataFrame":
     )
 
     pac_followup_visits_within_7_days_denom_sur = (
-        outclaims_pac_followup_visits_sur.select(
+        outclaims_pac.select(
             "elig_status",
             spark_funcs.lit("cnt_followup_visits_within_7_days_denom_sur").alias(
                 "metric_id"
             ),
-            "cnt_followup_visit_within_7_days_denom_yn",
+            spark_funcs.when(
+                (
+                    (spark_funcs.col("followup_visit_within_7_days_denom_yn") == "Y")
+                    & (spark_funcs.col("prm_line") == "I12")
+                ),
+                spark_funcs.lit(1),
+            )
+            .otherwise(spark_funcs.lit(0))
+            .alias("cnt_followup_visits_within_7_days_denom_yn"),
         )
         .groupBy("elig_status", "metric_id")
         .agg(
-            spark_funcs.sum("cnt_followup_visit_within_7_days_denom_yn").alias(
+            spark_funcs.sum("cnt_followup_visits_within_7_days_denom_yn").alias(
                 "metric_value"
             )
         )
