@@ -1,6 +1,11 @@
 ## Release Notes
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
+### V1.12.0
+  - Updated truncation thresholds to 2022Q4 QEXPU's Expenditure Truncation Thresholds/Factors, Including COVID-19 Episodes (Based on National Assignable FFS Population).
+  - Replaced costs_7 with costs_21 to fit the E&U comparator reports when claims cut off date changes each quarter
+  - Added 7 days follow up vists denominator and numerator of medical and surgical claims into pac metrics
+  
 ### v1.11.4
   - Add annual wellness visit denominator and numerator into comparator metrics
   - remove members that have no member months in the basics scripts
