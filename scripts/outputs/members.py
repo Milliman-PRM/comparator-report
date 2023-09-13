@@ -10,6 +10,7 @@ import logging
 import os
 
 from datetime import date
+from prm.dates.utils import date_as_month
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
 from pyspark.sql import Window
@@ -24,10 +25,68 @@ PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
 
 RUNOUT = 3
 
+ESRD_REV = ['0820','0821','0822','0823','0824','0825','0826','0829','0830','0831','0832','0833','0834','0835','0839','0840','0841','0842','0843','0844','0845','0849','0850','0851','0852','0853','0854','0855','0859',]
+ESRD_HCPCS = ['90963','90964','90965','90966',]
+ESRD_BILLTYPE = '72'
 # =============================================================================
 # LIBRARIES, LOCATIONS, LITERALS, ETC. GO ABOVE HERE
 # =============================================================================
+def flag_esrd(
+    outclaims,
+    min_incurred_date,
+    max_incurred_date
+    ) -> "DataFrame":
+    """Calculate whether a member should be flagged as ESRD"""
+    esrd_claims = outclaims.where(
+        (spark_funcs.col('hcpcs').isin(ESRD_HCPCS)) |
+        (spark_funcs.col('revcode').isin(ESRD_REV)) |
+        (spark_funcs.col('billtype').startswith(ESRD_BILLTYPE))
+    ).select(
+        'member_id',
+        date_as_month('prm_fromdate').alias('esrd_month'),
+    ).distinct()
 
+    esrd_cont_window = Window.partitionBy(
+        'member_id',
+    ).orderBy(
+        'esrd_month',
+    )
+    
+    continuous_esrd = esrd_claims.withColumn(
+        'row_number',
+        spark_funcs.row_number().over(esrd_cont_window)
+    ).select(
+        'member_id',
+        'esrd_month',
+        (
+            spark_funcs.year('esrd_month') * 12
+            + spark_funcs.month('esrd_month')
+            - spark_funcs.col('row_number')
+        ).alias('grouped_monthid')
+    )
+        
+    elig_esrd = continuous_esrd.groupBy(
+        'member_id',
+        'grouped_monthid'
+    ).agg(
+        spark_funcs.count('esrd_month').alias('cont_months')
+    ).where(
+        spark_funcs.col('cont_months') >= 3
+    )
+    
+    return continuous_esrd.join(
+        elig_esrd,
+        on=['member_id', 'grouped_monthid'],
+        how='inner'
+    ).where(
+        spark_funcs.col('esrd_month').between(
+            min_incurred_date,
+            max_incurred_date
+        )
+    ).select(
+        spark_funcs.col('member_id').alias('member_id_esrd')
+    ).distinct()
+    
 def main() -> int:
     """Create a member month table for assigned members"""
     sparkapp = SparkApp(META_SHARED['pipeline_signature'])
@@ -39,6 +98,7 @@ def main() -> int:
             PATH_INPUTS / 'time_periods.parquet',
             PATH_INPUTS / 'members.parquet',
             PATH_INPUTS / 'risk_scores.parquet',
+            PATH_INPUTS / 'outclaims.parquet',
         ]
     }
 
@@ -56,7 +116,7 @@ def main() -> int:
             1
         )
 
-    if os.environ.get('Currently_Assigned_Enabled', 'False').lower() == 'true' or os.environ.get('7_1ACOFlag_Enabled', 'False').lower() == 'true':
+    if os.environ.get('Currently_Assigned_Enabled', 'False').lower() == 'true':
         memmos_filter = spark_funcs.col('elig_month').between(
                             min_incurred_date,
                             max_incurred_date,
@@ -98,11 +158,18 @@ def main() -> int:
         how='inner'
     )
 
+    esrd_mems = flag_esrd(
+        dfs_input['outclaims'],
+        min_incurred_date,
+        max_incurred_date
+    )
+
     if os.environ.get('Currently_Assigned_Enabled', 'False').lower() == 'true':
         current_assigned = dfs_input['members'].filter(
             spark_funcs.col('assignment_indicator') == 'Y'
         ).select(
             'member_id',
+            'dob',
         )        
         
         member_join = member_months.join(
@@ -117,10 +184,29 @@ def main() -> int:
             current_assigned,
             on='member_id',
             how='inner',
+        ).join(
+            esrd_mems,
+            on=(member_months.member_id==esrd_mems.member_id_esrd),
+            how='left_outer',
+        ).withColumn(
+            'eligibility_type',
+            spark_funcs.when(
+                spark_funcs.col('member_id_esrd').isNotNull(),
+                spark_funcs.lit('ESRD'),
+            ).when(
+                max_incurred_date.year - spark_funcs.year('dob') < 65,
+                spark_funcs.lit('Under 65')
+            ).otherwise(
+                spark_funcs.lit('Aged')
+            )
         ).select(
             'member_id',
             'elig_month',
-            spark_funcs.col('elig_status_1').alias('elig_status'),
+            spark_funcs.concat_ws(
+                ' - ',
+                spark_funcs.col('elig_status_1'),
+                spark_funcs.col('eligibility_type'),
+            ).alias('elig_status'),
             member_months.memmos,
             'risk_score',
             spark_funcs.when(
@@ -132,40 +218,6 @@ def main() -> int:
         ).where(
             spark_funcs.col('elig_status') != 'Unknown'
         )
-    elif os.environ.get('7_1ACOFlag_Enabled', 'False').lower() == 'true':
-        current_assigned = dfs_input['members'].filter(
-            spark_funcs.col('mem_report_hier_2') == 'Y'
-        ).select(
-            'member_id',
-        )        
-        
-        member_join = member_months.join(
-            recent_info,
-            on=['member_id', 'elig_month'],
-            how='inner'
-        ).join(
-            risk_scores,
-            on='member_id',
-            how='left_outer'
-        ).join(
-            current_assigned,
-            on='member_id',
-            how='inner',
-        ).select(
-            'member_id',
-            'elig_month',
-            spark_funcs.col('elig_status_1').alias('elig_status'),
-            member_months.memmos,
-            'risk_score',
-            spark_funcs.when(
-                member_months.memmos > 0,
-                spark_funcs.lit('Y'),
-            ).otherwise(
-                spark_funcs.lit('N')
-            ).alias('cover_medical'),
-        ).where(
-            spark_funcs.col('elig_status') != 'Unknown'
-        )            
     else:
         member_join = member_months.join(
             recent_info,
@@ -175,10 +227,33 @@ def main() -> int:
             risk_scores,
             on='member_id',
             how='left_outer'
+        ).join(
+            dfs_input['members'].select('member_id', 'dob'),
+            on='member_id',
+            how='left_outer',
+        ).join(
+            esrd_mems,
+            on=(member_months.member_id==esrd_mems.member_id_esrd),
+            how='left_outer',
+        ).withColumn(
+            'eligibility_type',
+            spark_funcs.when(
+                spark_funcs.col('member_id_esrd').isNotNull(),
+                spark_funcs.lit('ESRD'),
+            ).when(
+                max_incurred_date.year - spark_funcs.year('dob') < 65,
+                spark_funcs.lit('Under 65')
+            ).otherwise(
+                spark_funcs.lit('Aged')
+            )
         ).select(
             'member_id',
             'elig_month',
-            spark_funcs.col('elig_status_1').alias('elig_status'),
+            spark_funcs.concat_ws(
+                ' - ',
+                spark_funcs.col('elig_status_1'),
+                spark_funcs.col('eligibility_type'),
+            ).alias('elig_status'),
             member_months.memmos,
             'risk_score',
             spark_funcs.when(
