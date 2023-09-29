@@ -1,7 +1,7 @@
 """
 ### CODE OWNERS: Giang Vu, Ocean Liu
 ### OBJECTIVE:
-  Calculate outpatient metrics used in comparator report
+  Add count of HCC markers for each member
 ### DEVELOPER NOTES:
   None
 """
