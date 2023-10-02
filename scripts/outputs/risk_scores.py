@@ -14,6 +14,7 @@ from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
 from pyspark.sql import Window
 import comparator_report.meta.project
+import prm.riskscr.hcc
 
 LOGGER = logging.getLogger(__name__)
 META_SHARED = comparator_report.meta.project.gather_metadata()
@@ -117,6 +118,18 @@ HCC_COLS = [
 def main() -> int:
     """Create a table with count of HCC markers for each member"""
     sparkapp = SparkApp(META_SHARED['pipeline_signature'])
+    
+    df_outclaims = sparkapp.load_df(
+            META_SHARED[73, "out"] / "outclaims_prm.parquet"
+    )
+    
+    df_member = sparkapp.load_df(
+            META_SHARED[35, "out"] / "member.parquet"
+    )
+    
+    df_member_time = sparkapp.load_df(
+            META_SHARED[35, "out"] / "member_time.parquet"
+    )
 
     dfs_input = {
         path.stem: sparkapp.load_df(path)
