@@ -14,16 +14,20 @@ import pyspark.sql.functions as spark_funcs
 
 from pyspark.sql import Window
 import comparator_report.meta.project
+import prm_ny_data_share.meta.project
 import prm.riskscr.hcc
 from prm.dates.windows import ClaimDateWindow
 import cms_hcc.pyspark_api
 
+from prm.spark.io_txt import export_csv #temporary just to export csv for review
+
 LOGGER = logging.getLogger(__name__)
-META_SHARED = comparator_report.meta.project.gather_metadata()
+META_SHARED = prm_ny_data_share.meta.project.gather_metadata()
+META_COMPARATOR = comparator_report.meta.project.gather_metadata()
 
 NAME_MODULE = 'outputs'
 PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
-PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
+PATH_OUTPUTS = META_COMPARATOR['path_data_comparator_report'] / NAME_MODULE
 
 HCC_COLS = [
     "hcc1",
@@ -174,7 +178,28 @@ def main() -> int:
         sparkapp, META_SHARED
     )  ### Ensure same paid through date for all ACOs
     
-    hcc_results = prm.riskscr.hcc.calc_hccs(sparkapp, dfs_input, time_periods) #join "member" with "feature_info" from this dictionary
+    hcc_results = prm.riskscr.hcc.calc_hccs(sparkapp, dfs_input, time_periods) 
+    #join dfs input "member" with "feature_info" from this dictionary
+    
+    hcc_count_results = (
+        hcc_results["feature_info"]
+        .join(
+            dfs_input["member"],
+            on="member_id",
+            how="inner",
+        ).where(spark_funcs.col("feature_name").isin(HCC_COLS))
+        .groupBy("member_id")
+        .agg(spark_funcs.count((spark_funcs.col("feature_name"))).alias("hcc_count"))
+    )
+    
+    #export hcc count per member for overview of their distribution before continuing putting them into bins
+    export_csv(
+        hcc_count_results,
+        PATH_OUTPUTS / "hcc_count_by_member.csv",
+        header = True,
+        single_file = True,
+        line_endings = "\n"
+    )
     
     return 0
 
