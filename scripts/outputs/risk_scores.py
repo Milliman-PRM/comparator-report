@@ -181,11 +181,22 @@ def main() -> int:
     hcc_results = prm.riskscr.hcc.calc_hccs(sparkapp, dfs_input, time_periods) 
     #join dfs input "member" with "feature_info" from this dictionary
     
-    hcc_count_results = (
-        hcc_results["feature_info"].where(spark_funcs.col("feature_name").isin(HCC_COLS))
-        .groupBy("member_id")
-        .agg(spark_funcs.count((spark_funcs.col("feature_name"))).alias("hcc_count"))
+    hcc_count_results = hcc_results["feature_info"].where(
+            spark_funcs.col("feature_name").isin(HCC_COLS)
+    ).groupBy(
+            "member_id"
+    ).agg(
+            spark_funcs.count((spark_funcs.col("feature_name"))).alias("hcc_count")
+    ).withColumn(
+            "hcc_count_bin",
+            spark_funcs.when(
+                    spark_funcs.col("hcc_count") > 8,
+                    spark_funcs.lit("9 and above")
+            ).otherwise(
+                    spark_funcs.lit(spark_funcs.col("hcc_count"))
+            )
     )
+    
     
     #export hcc count per member for overview of their distribution before continuing putting them into bins
     export_csv(
