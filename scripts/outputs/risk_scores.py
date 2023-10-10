@@ -126,7 +126,7 @@ def _create_time_periods(
 ) -> cms_hcc.pyspark_api.TimePeriods:
     """Create time periods input parameter for CMS-HCC processing"""
     modeling_windows = sparkapp.load_df(PATH_INPUTS / "time_periods.parquet").where(
-        spark_funcs.col("time_period_id").isin(["202312", "202412"]) #not sure about this part
+        spark_funcs.col("time_period_id").isin(["202312"]) #not sure about this part
     )
 
     iter_time_windows = modeling_windows.collect()
@@ -182,12 +182,7 @@ def main() -> int:
     #join dfs input "member" with "feature_info" from this dictionary
     
     hcc_count_results = (
-        hcc_results["feature_info"]
-        .join(
-            dfs_input["member"],
-            on="member_id",
-            how="inner",
-        ).where(spark_funcs.col("feature_name").isin(HCC_COLS))
+        hcc_results["feature_info"].where(spark_funcs.col("feature_name").isin(HCC_COLS))
         .groupBy("member_id")
         .agg(spark_funcs.count((spark_funcs.col("feature_name"))).alias("hcc_count"))
     )
@@ -200,6 +195,8 @@ def main() -> int:
         single_file = True,
         line_endings = "\n"
     )
+    
+    #diag date range: incstart=2022-01-01,incend=2022-12-31
     
     return 0
 
