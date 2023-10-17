@@ -162,7 +162,7 @@ def main() -> int:
     """Create a table with count of HCC markers for each member"""
     sparkapp = SparkApp(META_SHARED['pipeline_signature'])
     
-    dfs_input = {
+    dfs_input_hcc = {
         "outclaims": sparkapp.load_df(
             META_SHARED[73, "out"] / "outclaims_prm.parquet"
         ),
@@ -178,8 +178,15 @@ def main() -> int:
         sparkapp, META_SHARED
     )  ### Ensure same paid through date for all ACOs
     
-    hcc_results = prm.riskscr.hcc.calc_hccs(sparkapp, dfs_input, time_periods) 
-    #join dfs input "member" with "feature_info" from this dictionary
+    hcc_results = prm.riskscr.hcc.calc_hccs(sparkapp, dfs_input_hcc, time_periods) 
+    
+    dfs_input = {
+            path.stem: sparkapp.load_df(path)
+        for path in [
+            PATH_OUTPUTS / 'member_months.parquet',
+            PATH_INPUTS / 'member_time_windows.parquet',
+        ]
+    }
     
     hcc_count_results = hcc_results["feature_info"].where(
             spark_funcs.col("feature_name").isin(HCC_COLS)
@@ -197,6 +204,40 @@ def main() -> int:
             )
     )
     
+    #aggregate results by elig status
+    hcc_feature_results = hcc_results["feature_info"].where(
+            spark_funcs.col("feature_name").isin(HCC_COLS)
+    )
+    
+    member_months = dfs_input['member_months'].where(
+        spark_funcs.col('cover_medical') == 'Y'
+    )
+    
+    elig_memmos = dfs_input['member_time_windows'].where(
+        spark_funcs.col('cover_medical') == 'Y'
+    ).select(
+        'member_id',
+        'date_start',
+        'date_end',
+    )
+    
+    hcc_mem_results = hcc_feature_results.join(
+        elig_memmos,
+        on=[
+            hcc_feature_results.member_id == elig_memmos.member_id,
+            spark_funcs.col('latest_date_coded').between(
+                spark_funcs.col('date_start'),
+                spark_funcs.col('date_end'),
+            )
+            ],
+        how='inner',
+    ).join(
+        member_months,
+        on=(hcc_feature_results.member_id == member_months.member_id)
+        & (hcc_feature_results.month == member_months.elig_month), 
+        how='inner'
+    )
+    #think about this part, right now hcc_feature_results don't have a month column, use date coded or join with hcc_results['member_months']?
     
     #export hcc count per member for overview of their distribution before continuing putting them into bins
     export_csv(
