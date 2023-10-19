@@ -126,7 +126,7 @@ def _create_time_periods(
 ) -> cms_hcc.pyspark_api.TimePeriods:
     """Create time periods input parameter for CMS-HCC processing"""
     modeling_windows = sparkapp.load_df(PATH_INPUTS / "time_periods.parquet").where(
-        spark_funcs.col("time_period_id").isin(["202312"]) #not sure about this part
+        spark_funcs.col("time_period_id").isin(["202312"]) #set time period to 2023, can modify later
     )
 
     iter_time_windows = modeling_windows.collect()
@@ -197,10 +197,10 @@ def main() -> int:
     ).withColumn(
             "hcc_count_bin",
             spark_funcs.when(
-                    spark_funcs.col("hcc_count") > 8,
-                    spark_funcs.lit("9 and above")
+                    spark_funcs.col("hcc_count") > 5,
+                    spark_funcs.lit("hcc_count_6_and_above")
             ).otherwise(
-                    spark_funcs.lit(spark_funcs.col("hcc_count"))
+                    spark_funcs.concat(spark_funcs.lit("hcc_count_"), spark_funcs.lit(spark_funcs.col("hcc_count")))
             )
     )
     
@@ -211,12 +211,16 @@ def main() -> int:
     
     member_months = dfs_input['member_months'].where(
         spark_funcs.col('cover_medical') == 'Y'
+    ).select(
+        spark_funcs.col('member_id').alias('member_id_memmos'),
+        'elig_month',
+        'elig_status',
     )
     
     elig_memmos = dfs_input['member_time_windows'].where(
         spark_funcs.col('cover_medical') == 'Y'
     ).select(
-        'member_id',
+        spark_funcs.col('member_id').alias('member_id_elig'),
         'date_start',
         'date_end',
     )
@@ -224,7 +228,7 @@ def main() -> int:
     hcc_mem_results = hcc_feature_results.join(
         elig_memmos,
         on=[
-            hcc_feature_results.member_id == elig_memmos.member_id,
+            hcc_feature_results.member_id == elig_memmos.member_id_elig,
             spark_funcs.col('latest_date_coded').between(
                 spark_funcs.col('date_start'),
                 spark_funcs.col('date_end'),
@@ -233,22 +237,45 @@ def main() -> int:
         how='inner',
     ).join(
         member_months,
-        on=(hcc_feature_results.member_id == member_months.member_id)
-        & (hcc_feature_results.month == member_months.elig_month), 
+        on=(hcc_feature_results.member_id == member_months.member_id_memmos)
+        & (spark_funcs.col('elig_month').between(
+                spark_funcs.col('date_start'),
+                spark_funcs.col('date_end'))
+            ), 
         how='inner'
+    ).select(
+        spark_funcs.col("member_id"),
+        spark_funcs.col("elig_status")
+    ).distinct()
+    #join with elig memmos & then member months to get elig status of each member for a specific month
+    
+    #then join with hcc count per member to count number of members for each hcc_count bin per elig status
+    hcc_count_elig = hcc_mem_results.join(
+        hcc_count_results,
+        on = "member_id",
+        how= "left"
+    ).groupBy(
+            spark_funcs.col("elig_status"),
+            spark_funcs.col("hcc_count_bin").alias("metric_id")
+    ).agg(
+            spark_funcs.count((spark_funcs.col("member_id"))).alias("metric_value")
     )
-    #think about this part, right now hcc_feature_results don't have a month column, use date coded or join with hcc_results['member_months']?
     
     #export hcc count per member for overview of their distribution before continuing putting them into bins
-    export_csv(
-        hcc_count_results,
-        PATH_OUTPUTS / "hcc_count_by_member.csv",
-        header = True,
-        single_file = True,
-        line_endings = "\n"
-    )
+#    export_csv(
+#        hcc_count_results,
+#        PATH_OUTPUTS / "hcc_count_by_member.csv",
+#        header = True,
+#        single_file = True,
+#        line_endings = "\n"
+#    )
     
     #diag date range: incstart=2022-01-01,incend=2022-12-31
+    
+    sparkapp.save_df(
+        hcc_count_elig,
+        PATH_OUTPUTS / 'risk_scores_metrics.parquet',
+    )
     
     return 0
 
