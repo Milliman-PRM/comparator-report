@@ -184,10 +184,10 @@ def main() -> int:
             path.stem: sparkapp.load_df(path)
         for path in [
             PATH_OUTPUTS / 'member_months.parquet',
-            PATH_INPUTS / 'member_time_windows.parquet',
         ]
     }
     
+    #count hcc markers per member_id
     hcc_count_results = hcc_results["feature_info"].where(
             spark_funcs.col("feature_name").isin(HCC_COLS)
     ).groupBy(
@@ -204,62 +204,63 @@ def main() -> int:
             )
     )
     
-    #aggregate results by elig status
-    hcc_feature_results = hcc_results["feature_info"].where(
-            spark_funcs.col("feature_name").isin(HCC_COLS)
-    )
-    
+    #get latest elig status of each member ID
     member_months = dfs_input['member_months'].where(
         spark_funcs.col('cover_medical') == 'Y'
     ).select(
-        spark_funcs.col('member_id').alias('member_id_memmos'),
+        'member_id',
         'elig_month',
         'elig_status',
     )
     
-    elig_memmos = dfs_input['member_time_windows'].where(
-        spark_funcs.col('cover_medical') == 'Y'
-    ).select(
-        spark_funcs.col('member_id').alias('member_id_elig'),
-        'date_start',
-        'date_end',
+    flag_window = Window.partitionBy("member_id").orderBy(
+            spark_funcs.col("elig_month").desc()
     )
     
-    hcc_mem_results = hcc_feature_results.join(
-        elig_memmos,
-        on=[
-            hcc_feature_results.member_id == elig_memmos.member_id_elig,
-            spark_funcs.col('latest_date_coded').between(
-                spark_funcs.col('date_start'),
-                spark_funcs.col('date_end'),
-            )
-            ],
-        how='inner',
-    ).join(
-        member_months,
-        on=(hcc_feature_results.member_id == member_months.member_id_memmos)
-        & (spark_funcs.col('elig_month').between(
-                spark_funcs.col('date_start'),
-                spark_funcs.col('date_end'))
-            ), 
-        how='inner'
+    elig_memmos = member_months.withColumn(
+            "rank",
+            spark_funcs.row_number().over(flag_window)
+    ).where(
+            spark_funcs.col("rank") == 1
+    )
+    
+    #left join elig memmos with hcc count results to also include members without any HCC marker
+    #hcc_mem_results contain all member_id that have cover_medical = Y, their latest elig_status and their number of hcc markers
+    hcc_mem_results = elig_memmos.join(
+        hcc_count_results,
+        on= "member_id",
+        how='left',
     ).select(
         spark_funcs.col("member_id"),
-        spark_funcs.col("elig_status")
-    ).distinct()
-    #join with elig memmos & then member months to get elig status of each member for a specific month
-    
-    #then join with hcc count per member to count number of members for each hcc_count bin per elig status
-    hcc_count_elig = hcc_mem_results.join(
-        hcc_count_results,
-        on = "member_id",
-        how= "left"
-    ).groupBy(
+        spark_funcs.col("elig_status"),
+        spark_funcs.coalesce(spark_funcs.col("hcc_count"), spark_funcs.lit(0)).alias("hcc_count"),
+        spark_funcs.coalesce(spark_funcs.col("hcc_count_bin"), spark_funcs.lit("hcc_count_0")).alias("hcc_count_bin")
+    )
+
+    #then aggregate hcc_mem_results to count number of members for each hcc_count bin per elig status
+    mem_count_per_bin_per_elig = hcc_mem_results.groupBy(
             spark_funcs.col("elig_status"),
             spark_funcs.col("hcc_count_bin").alias("metric_id")
     ).agg(
             spark_funcs.count((spark_funcs.col("member_id"))).alias("metric_value")
     )
+    
+    #find average number of hcc count per elig status
+    hcc_count_avg_per_elig = hcc_mem_results.groupBy(
+             spark_funcs.col("elig_status")
+    ).agg(
+            spark_funcs.mean(spark_funcs.col("hcc_count")).alias("hcc_count_avg")
+    )
+    
+    #find number of members per each hcc marker
+    mem_count_per_hcc = hcc_results["feature_info"].where(
+            spark_funcs.col("feature_name").isin(HCC_COLS)
+    ).groupBy(
+            spark_funcs.col("feature_name").alias("hcc_marker")
+    ).agg(
+            spark_funcs.countDistinct(spark_funcs.col("member_id")).alias("member_count")
+    )
+    
     
     #export hcc count per member for overview of their distribution before continuing putting them into bins
 #    export_csv(
@@ -273,7 +274,7 @@ def main() -> int:
     #diag date range: incstart=2022-01-01,incend=2022-12-31
     
     sparkapp.save_df(
-        hcc_count_elig,
+        mem_count_per_bin_per_elig,
         PATH_OUTPUTS / 'risk_scores_metrics.parquet',
     )
     
