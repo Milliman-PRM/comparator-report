@@ -164,16 +164,16 @@ def main() -> int:
     
     dfs_input_hcc = {
         "outclaims": sparkapp.load_df(
-            META_SHARED[73, "out"] / "outclaims_prm.parquet"
+            PATH_INPUTS / "outclaims.parquet"
         ),
         "member": sparkapp.load_df(
-            META_SHARED[35, "out"] / "member.parquet"
+            PATH_INPUTS / "members.parquet"
         ),
         "member_time": sparkapp.load_df(
-            META_SHARED[35, "out"] / "member_time.parquet"
+            PATH_INPUTS / "member_time_windows.parquet"
         ),
-    }
-    
+    }    
+
     time_periods = _create_time_periods(
         sparkapp, META_SHARED
     )  ### Ensure same paid through date for all ACOs
@@ -200,7 +200,7 @@ def main() -> int:
                     spark_funcs.col("hcc_count") > 5,
                     spark_funcs.lit("hcc_count_6_and_above")
             ).otherwise(
-                    spark_funcs.concat(spark_funcs.lit("hcc_count_"), spark_funcs.lit(spark_funcs.col("hcc_count")))
+                    spark_funcs.concat(spark_funcs.lit("hcc_count_"), spark_funcs.col("hcc_count").cast("string"))
             )
     )
     
