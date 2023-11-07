@@ -247,20 +247,37 @@ def main() -> int:
     
     #find average number of hcc count per elig status
     hcc_count_avg_per_elig = hcc_mem_results.groupBy(
-             spark_funcs.col("elig_status")
+             spark_funcs.col("elig_status"),
+             spark_funcs.lit("avg_hcc_count").alias("metric_id")
     ).agg(
-            spark_funcs.mean(spark_funcs.col("hcc_count")).alias("hcc_count_avg")
+            spark_funcs.mean(spark_funcs.col("hcc_count")).alias("metric_value")
     )
     
-    #find number of members per each hcc marker
+    #find number of members per each hcc marker, grouped by elig status. 
+    #inner join with elig_memmos because there are members that are not in member_months/elig_memmos but have hcc markers in hcc_results
     mem_count_per_hcc = hcc_results["feature_info"].where(
             spark_funcs.col("feature_name").isin(HCC_COLS)
+    ).join(
+            elig_memmos,
+            on = "member_id",
+            how = "inner"
+    ).select(
+            spark_funcs.col("member_id"),
+            spark_funcs.col("elig_status"),
+            spark_funcs.col("feature_name")
     ).groupBy(
-            spark_funcs.col("feature_name").alias("hcc_marker")
+            spark_funcs.col("elig_status"),
+            spark_funcs.concat(spark_funcs.col("feature_name"), spark_funcs.lit("_member_count")).alias("metric_id")
     ).agg(
-            spark_funcs.countDistinct(spark_funcs.col("member_id")).alias("member_count")
+            spark_funcs.countDistinct(spark_funcs.col("member_id")).alias("metric_value")
     )
     
+    #stack all calculation on top of each other for final risk score output
+    risk_scores_metric_out = mem_count_per_bin_per_elig.union(
+            hcc_count_avg_per_elig
+    ).union(
+            mem_count_per_hcc
+    )
     
     #export hcc count per member for overview of their distribution before continuing putting them into bins
 #    export_csv(
@@ -274,7 +291,7 @@ def main() -> int:
     #diag date range: incstart=2022-01-01,incend=2022-12-31
     
     sparkapp.save_df(
-        mem_count_per_bin_per_elig,
+        risk_scores_metric_out,
         PATH_OUTPUTS / 'risk_scores_metrics.parquet',
     )
     
