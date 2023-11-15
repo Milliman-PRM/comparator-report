@@ -161,7 +161,7 @@ def main() -> int:
     )
 
     hosp_days = claims_mem.where(
-        spark_funcs.col('prm_line') == 'P82b'
+        spark_funcs.col('prm_line').isin(["P82d", "P82e"])
     ).select(
         'member_id',
         'prm_util',

@@ -1,6 +1,8 @@
 ## Release Notes
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
+### V1.12.1
+  - Updated prm_line of hospice in eol.py based on updated HCG Grouper v2023 codes
 ### V1.12.0
   - Updated truncation thresholds to 2022Q4 QEXPU's Expenditure Truncation Thresholds/Factors, Including COVID-19 Episodes (Based on National Assignable FFS Population).
   - Replaced costs_7 with costs_21 to fit the E&U comparator reports when claims cut off date changes each quarter
