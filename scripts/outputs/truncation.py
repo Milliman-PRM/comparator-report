@@ -7,7 +7,7 @@
 """
 # pylint: disable=no-member
 import logging
-
+import os
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
 from prm.dates.utils import date_as_month
@@ -22,8 +22,10 @@ NAME_MODULE = 'outputs'
 PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
 PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
 
-RUNOUT = 3
-
+if os.environ.get('STLMT_Enabled', 'False').lower() == 'true':
+    RUNOUT = 3
+else: 
+    RUNOUT = 9
 # =============================================================================
 # LIBRARIES, LOCATIONS, LITERALS, ETC. GO ABOVE HERE
 # =============================================================================
@@ -99,7 +101,16 @@ def truncation_summary(
                 spark_funcs.lit(0)
             ).alias('{col}_21'.format(col=ime_dsh_ucc))
             for ime_dsh_ucc in ['ime_sum', 'dsh_sum', 'ucc_sum']
-        ]        
+        ],
+        *[
+            spark_funcs.when(
+                spark_funcs.col('paiddate') <= dt_dict['qexpu_runout_3mos'],
+                spark_funcs.col(ime_dsh_ucc),
+            ).otherwise(
+                spark_funcs.lit(0)
+            ).alias('{col}_3mos'.format(col=ime_dsh_ucc))
+            for ime_dsh_ucc in ['ime_sum', 'dsh_sum', 'ucc_sum']
+        ],
     ).distinct()
 
     ime_dsh_ucc_summary = distinct_ime_dsh_ucc.groupBy(
@@ -133,6 +144,22 @@ def truncation_summary(
                 spark_funcs.lit(0)
             )
         ).alias('costs_21'),
+        spark_funcs.sum(
+            spark_funcs.when(
+                spark_funcs.col('paiddate') <= dt_dict['qexpu_runout_3mos'],
+                spark_funcs.col('prm_costs')
+            ).otherwise(
+                spark_funcs.lit(0)
+            )
+        ).alias('costs_3mos'),   
+        spark_funcs.sum(
+            spark_funcs.when(
+                spark_funcs.col('paiddate') <= dt_dict['qexpu_runout_3mos_14'],
+                spark_funcs.col('prm_costs')
+            ).otherwise(
+                spark_funcs.lit(0)
+            )
+        ).alias('costs_3mos_14'),             
     )
     
     memmos_summary = member_months.groupBy(
@@ -172,7 +199,7 @@ def truncation_summary(
         )
     )
 
-    for suffix in ['costs', 'costs_14', 'costs_21']:
+    for suffix in ['costs', 'costs_14', 'costs_21','costs_3mos','costs_3mos_14']:
         mem_all_costs = mem_all_costs.withColumn(
             '{col}_reduced'.format(col=suffix),
             spark_funcs.col(suffix)
@@ -221,18 +248,29 @@ def main() -> int:
     
     qexpu_runout_14 = max_incurred_date + timedelta(days=14)
     qexpu_runout_21 = max_incurred_date + timedelta(days=21)
-
+    qexpu_runout_3mos = max_incurred_date + timedelta(months=3)
+    qexpu_runout_3mos_14 = max_incurred_date + timedelta(months=3, days=14)
+    
     member_months = dfs_input['member_months'].where(
         spark_funcs.col('cover_medical') == 'Y'
     )
 
-    dt_dict = {
+    if os.environ.get('STLMT_Enabled', 'False').lower() == 'true':
+        dt_dict = {
         'min_incurred_date' : min_incurred_date,
         'max_incurred_date' : max_incurred_date,
         'qexpu_runout_14' : qexpu_runout_14,
         'qexpu_runout_21' : qexpu_runout_21,
     }
-
+    
+    else: 
+        dt_dict = {
+        'min_incurred_date' : min_incurred_date,
+        'max_incurred_date' : max_incurred_date,
+        'qexpu_runout_3mos' : qexpu_runout_3mos,
+        'qexpu_runout_3mos_14' : qexpu_runout_3mos_14,
+    }
+    
     trunc_fromdt = truncation_summary(
         dfs_input['outclaims'],
         member_months,
