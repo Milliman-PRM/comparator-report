@@ -180,12 +180,9 @@ def main() -> int:
     
     hcc_results = prm.riskscr.hcc.calc_hccs(sparkapp, dfs_input_hcc, time_periods) 
     
-    dfs_input = {
-            path.stem: sparkapp.load_df(path)
-        for path in [
-            PATH_OUTPUTS / 'member_months.parquet',
-        ]
-    }
+    member_months_input = sparkapp.load_df(
+        PATH_OUTPUTS / 'member_months.parquet'
+    )
     
     #count hcc markers per member_id
     hcc_count_results = hcc_results["feature_info"].where(
@@ -205,7 +202,7 @@ def main() -> int:
     )
     
     #get latest elig status of each member ID
-    member_months = dfs_input['member_months'].where(
+    member_months = member_months_input.where(
         spark_funcs.col('cover_medical') == 'Y'
     ).select(
         'member_id',
