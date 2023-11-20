@@ -11,7 +11,7 @@ import os
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
 from prm.dates.utils import date_as_month
-from datetime import timedelta
+from dateutil.relativedelta import relativedelta
 
 import comparator_report.meta.project
 
@@ -246,10 +246,10 @@ def main() -> int:
         spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
     ).collect()[0]
     
-    qexpu_runout_14 = max_incurred_date + timedelta(days=14)
-    qexpu_runout_21 = max_incurred_date + timedelta(days=21)
-    qexpu_runout_3mos = max_incurred_date + timedelta(month=3)
-    qexpu_runout_3mos_14 = max_incurred_date + timedelta(month=3, days=14)
+    qexpu_runout_14 = max_incurred_date + relativedelta(days=14)
+    qexpu_runout_21 = max_incurred_date + relativedelta(days=21)
+    qexpu_runout_3mos = max_incurred_date + relativedelta(month=3)
+    qexpu_runout_3mos_14 = max_incurred_date + relativedelta(month=3, days=14)
     
     member_months = dfs_input['member_months'].where(
         spark_funcs.col('cover_medical') == 'Y'
