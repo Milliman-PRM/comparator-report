@@ -257,8 +257,8 @@ def main() -> int:
     
     qexpu_runout_14 = max_incurred_date + relativedelta(days=14)
     qexpu_runout_21 = max_incurred_date + relativedelta(days=21)
-    qexpu_runout_3mos = max_incurred_date + relativedelta(month=3)
-    qexpu_runout_3mos_14 = max_incurred_date + relativedelta(month=3, days=14)
+    qexpu_runout_3mos = max_incurred_date + relativedelta(months=3)
+    qexpu_runout_3mos_14 = max_incurred_date + relativedelta(months=3, days=14)
     
     member_months = dfs_input['member_months'].where(
         spark_funcs.col('cover_medical') == 'Y'
