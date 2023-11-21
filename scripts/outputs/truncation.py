@@ -111,6 +111,15 @@ def truncation_summary(
             ).alias('{col}_3mos'.format(col=ime_dsh_ucc))
             for ime_dsh_ucc in ['ime_sum', 'dsh_sum', 'ucc_sum']
         ],
+        *[
+            spark_funcs.when(
+                spark_funcs.col('paiddate') <= dt_dict['qexpu_runout_3mos_14'],
+                spark_funcs.col(ime_dsh_ucc),
+            ).otherwise(
+                spark_funcs.lit(0)
+            ).alias('{col}_3mos_14'.format(col=ime_dsh_ucc))
+            for ime_dsh_ucc in ['ime_sum', 'dsh_sum', 'ucc_sum']
+        ],
     ).distinct()
 
     ime_dsh_ucc_summary = distinct_ime_dsh_ucc.groupBy(
@@ -255,18 +264,11 @@ def main() -> int:
         spark_funcs.col('cover_medical') == 'Y'
     )
 
-    if os.environ.get('STLMT_Enabled', 'False').lower() == 'true':
-        dt_dict = {
+    dt_dict = {
         'min_incurred_date' : min_incurred_date,
         'max_incurred_date' : max_incurred_date,
         'qexpu_runout_14' : qexpu_runout_14,
         'qexpu_runout_21' : qexpu_runout_21,
-    }
-    
-    else: 
-        dt_dict = {
-        'min_incurred_date' : min_incurred_date,
-        'max_incurred_date' : max_incurred_date,
         'qexpu_runout_3mos' : qexpu_runout_3mos,
         'qexpu_runout_3mos_14' : qexpu_runout_3mos_14,
     }
