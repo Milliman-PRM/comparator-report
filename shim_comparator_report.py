@@ -39,7 +39,7 @@ def main() -> int:
         'YTD_Only': 'True',
         'Currently_Assigned_Enabled': 'True',
         '7_1ACOFlag_Enabled': 'False',
-        'STLMT_Enabled': 'False',
+        'STLMT_Enabled': 0,
     }
 
     Members.kwargs_passthru = _comparator_kwargs
@@ -58,7 +58,7 @@ def main() -> int:
         'YTD_Only': 'False',
         'Currently_Assigned_Enabled': 'True',
         '7_1ACOFlag_Enabled': 'False',
-        'STLMT_Enabled': 'False',
+        'STLMT_Enabled': 0,
     }
 
     Members.kwargs_passthru = _comparator_kwargs
@@ -77,7 +77,7 @@ def main() -> int:
         'YTD_Only': 'False',
         'Currently_Assigned_Enabled': 'True',
         '7_1ACOFlag_Enabled': 'False',
-        'STLMT_Enabled': 'False',
+        'STLMT_Enabled': 0,
     }
     
     Members.kwargs_passthru = _comparator_kwargs
