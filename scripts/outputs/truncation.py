@@ -110,11 +110,11 @@ def truncation_summary(
         ],
         *[
             spark_funcs.when(
-                spark_funcs.col('paiddate') <= dt_dict['qexpu_runout_3mos_14'],
+                spark_funcs.col('paiddate') <= dt_dict['qexpu_runout_3mos_7'],
                 spark_funcs.col(ime_dsh_ucc),
             ).otherwise(
                 spark_funcs.lit(0)
-            ).alias('{col}_3mos_14'.format(col=ime_dsh_ucc))
+            ).alias('{col}_3mos_7'.format(col=ime_dsh_ucc))
             for ime_dsh_ucc in ['ime_sum', 'dsh_sum', 'ucc_sum']
         ],
     ).distinct()
@@ -160,12 +160,12 @@ def truncation_summary(
         ).alias('costs_3mos'),   
         spark_funcs.sum(
             spark_funcs.when(
-                spark_funcs.col('paiddate') <= dt_dict['qexpu_runout_3mos_14'],
+                spark_funcs.col('paiddate') <= dt_dict['qexpu_runout_3mos_7'],
                 spark_funcs.col('prm_costs')
             ).otherwise(
                 spark_funcs.lit(0)
             )
-        ).alias('costs_3mos_14'),             
+        ).alias('costs_3mos_7'),             
     )
     
     memmos_summary = member_months.groupBy(
@@ -205,7 +205,7 @@ def truncation_summary(
         )
     )
 
-    for suffix in ['costs', 'costs_14', 'costs_21','costs_3mos','costs_3mos_14']:
+    for suffix in ['costs', 'costs_14', 'costs_21','costs_3mos','costs_3mos_7']:
         mem_all_costs = mem_all_costs.withColumn(
             '{col}_reduced'.format(col=suffix),
             spark_funcs.col(suffix)
@@ -255,7 +255,7 @@ def main() -> int:
     qexpu_runout_14 = max_incurred_date + relativedelta(days=14)
     qexpu_runout_21 = max_incurred_date + relativedelta(days=21)
     qexpu_runout_3mos = max_incurred_date + relativedelta(months=3)
-    qexpu_runout_3mos_14 = max_incurred_date + relativedelta(months=3, days=14)
+    qexpu_runout_3mos_7 = max_incurred_date + relativedelta(months=3, days=7)
     
     member_months = dfs_input['member_months'].where(
         spark_funcs.col('cover_medical') == 'Y'
@@ -267,7 +267,7 @@ def main() -> int:
         'qexpu_runout_14' : qexpu_runout_14,
         'qexpu_runout_21' : qexpu_runout_21,
         'qexpu_runout_3mos' : qexpu_runout_3mos,
-        'qexpu_runout_3mos_14' : qexpu_runout_3mos_14,
+        'qexpu_runout_3mos_7' : qexpu_runout_3mos_7,
     }
     
     trunc_fromdt = truncation_summary(
