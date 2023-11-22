@@ -231,13 +231,13 @@ def main() -> int:
         spark_funcs.col("member_id"),
         spark_funcs.col("elig_status"),
         spark_funcs.coalesce(spark_funcs.col("hcc_count"), spark_funcs.lit(0)).alias("hcc_count"),
-        spark_funcs.coalesce(spark_funcs.col("hcc_count_bin"), spark_funcs.lit("hcc_count_0")).alias("hcc_count_bin")
+        spark_funcs.coalesce(spark_funcs.col("hcc_count_bin"), spark_funcs.lit("hcc_count_0")).alias("metric_id")
     )
 
     #then aggregate hcc_mem_results to count number of members for each hcc_count bin per elig status
     mem_count_per_bin_per_elig = hcc_mem_results.groupBy(
             spark_funcs.col("elig_status"),
-            spark_funcs.col("hcc_count_bin").alias("metric_id")
+            spark_funcs.col("metric_id")
     ).agg(
             spark_funcs.count((spark_funcs.col("member_id"))).alias("metric_value")
     )
@@ -258,15 +258,11 @@ def main() -> int:
             elig_memmos,
             on = "member_id",
             how = "inner"
-    ).select(
-            spark_funcs.col("member_id"),
-            spark_funcs.col("elig_status"),
-            spark_funcs.col("feature_name")
     ).groupBy(
             spark_funcs.col("elig_status"),
             spark_funcs.concat(spark_funcs.col("feature_name"), spark_funcs.lit("_member_count")).alias("metric_id")
     ).agg(
-            spark_funcs.countDistinct(spark_funcs.col("member_id")).alias("metric_value")
+            spark_funcs.count(spark_funcs.col("member_id")).alias("metric_value")
     )
     
     #stack all calculation on top of each other for final risk score output
