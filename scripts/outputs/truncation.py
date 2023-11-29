@@ -190,16 +190,16 @@ def truncation_summary(
         'truncation_threshold',
         spark_funcs.when(
             spark_funcs.col('elig_status') == 'Aged Non-Dual',
-            139228 * spark_funcs.col('memmos') / 12,
+            147189 * spark_funcs.col('memmos') / 12,
         ).when(
             spark_funcs.col('elig_status') == 'Aged Dual',
-            219966 * spark_funcs.col('memmos') / 12,
+            236991 * spark_funcs.col('memmos') / 12,
         ).when(
             spark_funcs.col('elig_status') == 'Disabled',
-            167718 * spark_funcs.col('memmos') / 12,
+            177548 * spark_funcs.col('memmos') / 12,
         ).when(
             spark_funcs.col('elig_status') == 'ESRD',
-            483949 * spark_funcs.col('memmos') / 12,
+            507077 * spark_funcs.col('memmos') / 12,
         ).otherwise(
             99999999999
         )
