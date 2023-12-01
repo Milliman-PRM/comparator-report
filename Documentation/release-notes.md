@@ -3,7 +3,7 @@
 A non-exhaustive list of what has changed in a more readable form than a commit history.
 ### V1.12.2
   - Updated truncation thresholds to 2022 Settlement AEXPU's Expenditure Truncation Thresholds/Factors.
-  - Changed the runout to a variable so the varible coule be set in client_env.bat
+  - Changed the runout to a variable so the variable coule be set in client_env.bat
   - Added the 3 months runout option in the truncation.py
 ### V1.12.1
   - Updated prm_line of hospice in eol.py based on updated HCG Grouper v2023 codes
