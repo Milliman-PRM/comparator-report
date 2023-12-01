@@ -8,7 +8,7 @@
 """
 # pylint: disable=no-member
 import logging
-
+import os
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
 from prm.dates.utils import date_as_month
@@ -23,7 +23,7 @@ PATH_INPUTS = META_SHARED["path_data_nyhealth_shared"] / NAME_MODULE
 PATH_RS = META_SHARED["path_data_nyhealth_shared"] / "risk_scores"
 PATH_OUTPUTS = META_SHARED["path_data_comparator_report"] / NAME_MODULE
 WELLNESS_HCPCS = ["G0402", "G0438", "G0439", "G0468"]
-RUNOUT = 3
+RUNOUT=os.environ.get('runout')
 
 # =============================================================================
 # LIBRARIES, LOCATIONS, LITERALS, ETC. GO ABOVE HERE
@@ -157,19 +157,19 @@ def main() -> int:
             "truncation_threshold",
             spark_funcs.when(
                 spark_funcs.col("elig_status") == "Aged Non-Dual",
-                138974 * spark_funcs.col("memmos") / 12,
+                147189 * spark_funcs.col("memmos") / 12,
             )
             .when(
                 spark_funcs.col("elig_status") == "Aged Dual",
-                225780 * spark_funcs.col("memmos") / 12,
+                236991 * spark_funcs.col("memmos") / 12,
             )
             .when(
                 spark_funcs.col("elig_status") == "Disabled",
-                167346 * spark_funcs.col("memmos") / 12,
+                177548 * spark_funcs.col("memmos") / 12,
             )
             .when(
                 spark_funcs.col("elig_status") == "ESRD",
-                483440 * spark_funcs.col("memmos") / 12,
+                507077 * spark_funcs.col("memmos") / 12,
             )
             .otherwise(99999999),
         )

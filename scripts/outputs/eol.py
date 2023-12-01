@@ -22,7 +22,7 @@ PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
 PATH_RS = META_SHARED['path_data_nyhealth_shared'] / 'risk_scores'
 PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
 
-RUNOUT = 3
+RUNOUT=os.environ.get('runout')
 
 # =============================================================================
 # LIBRARIES, LOCATIONS, LITERALS, ETC. GO ABOVE HERE
