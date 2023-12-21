@@ -23,7 +23,8 @@ PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
 PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
 PATH_REF = Path(os.environ['reference_data_pathref'])
 
-RUNOUT=os.environ.get('runout')
+default_runout = '3'
+RUNOUT = os.environ.get('runout', default_runout)
 
 # =============================================================================
 # LIBRARIES, LOCATIONS, LITERALS, ETC. GO ABOVE HERE
