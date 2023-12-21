@@ -11,6 +11,7 @@ import datetime
 import typing
 from prm.spark.app import SparkApp
 import pyspark.sql.functions as spark_funcs
+from dateutil.relativedelta import *
 
 from pyspark.sql import Window
 import comparator_report.meta.project
@@ -18,8 +19,6 @@ import prm_ny_data_share.meta.project
 import prm.riskscr.hcc
 from prm.dates.windows import ClaimDateWindow
 import cms_hcc.pyspark_api
-
-from prm.spark.io_txt import export_csv  # temporary just to export csv for review
 
 LOGGER = logging.getLogger(__name__)
 META_SHARED = prm_ny_data_share.meta.project.gather_metadata()
@@ -126,10 +125,12 @@ def _create_time_periods(
     sparkapp: SparkApp, meta_shared: typing.Mapping[str, typing.Any]
 ) -> cms_hcc.pyspark_api.TimePeriods:
     """Create time periods input parameter for CMS-HCC processing"""
+    
+    time_period_date = meta_shared["date_latestpaid"] + relativedelta(months =- 3)
+    time_period_str = time_period_date.strftime("%Y%m")
+
     modeling_windows = sparkapp.load_df(PATH_INPUTS / "time_periods.parquet").where(
-        spark_funcs.col("time_period_id").isin(
-            ["202312"]
-        )
+        spark_funcs.col("time_period_id").isin(time_period_str)
     )
 
     iter_time_windows = modeling_windows.collect()
