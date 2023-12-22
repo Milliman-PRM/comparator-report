@@ -28,6 +28,8 @@ NAME_MODULE = "outputs"
 PATH_INPUTS = META_SHARED["path_data_nyhealth_shared"] / NAME_MODULE
 PATH_OUTPUTS = META_COMPARATOR["path_data_comparator_report"] / NAME_MODULE
 
+RUNOUT = os.environ.get('runout')
+
 HCC_COLS = [
     "hcc1",
     "hcc2",
@@ -126,7 +128,7 @@ def _create_time_periods(
 ) -> cms_hcc.pyspark_api.TimePeriods:
     """Create time periods input parameter for CMS-HCC processing"""
     
-    time_period_date = meta_shared["date_latestpaid"] + relativedelta(months =- 3)
+    time_period_date = meta_shared["date_latestpaid"] + relativedelta(months =- int(RUNOUT))
     time_period_str = time_period_date.strftime("%Y%m")
 
     modeling_windows = sparkapp.load_df(PATH_INPUTS / "time_periods.parquet").where(
