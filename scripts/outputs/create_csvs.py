@@ -21,8 +21,7 @@ NAME_MODULE = 'outputs'
 PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
 PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
 NONESRD = ['Aged Non-Dual', 'Aged Dual', 'Disabled']
-default_runout = '3'
-RUNOUT = os.environ.get('runout', default_runout)
+RUNOUT = os.environ.get('runout', 3)
 # =============================================================================
 # LIBRARIES, LOCATIONS, LITERALS, ETC. GO ABOVE HERE
 # =============================================================================
