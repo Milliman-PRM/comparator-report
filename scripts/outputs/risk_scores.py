@@ -28,7 +28,7 @@ NAME_MODULE = "outputs"
 PATH_INPUTS = META_SHARED["path_data_nyhealth_shared"] / NAME_MODULE
 PATH_OUTPUTS = META_COMPARATOR["path_data_comparator_report"] / NAME_MODULE
 
-RUNOUT = os.environ.get('runout')
+RUNOUT = os.environ.get("runout")
 
 HCC_COLS = [
     "hcc1",
@@ -127,8 +127,10 @@ def _create_time_periods(
     sparkapp: SparkApp, meta_shared: typing.Mapping[str, typing.Any]
 ) -> cms_hcc.pyspark_api.TimePeriods:
     """Create time periods input parameter for CMS-HCC processing"""
-    
-    time_period_date = meta_shared["date_latestpaid"] + relativedelta(months =- int(RUNOUT))
+
+    time_period_date = meta_shared["date_latestpaid"] + relativedelta(
+        months=-int(RUNOUT)
+    )
     time_period_str = time_period_date.strftime("%Y%m")
 
     modeling_windows = sparkapp.load_df(PATH_INPUTS / "time_periods.parquet").where(
@@ -213,44 +215,88 @@ def main() -> int:
         "rank", spark_funcs.row_number().over(flag_window)
     ).where(spark_funcs.col("rank") == 1)
 
-    hcc_mem_results = elig_memmos.join(
-        hcc_count_results, on="member_id", how="left"
-    ).select(
-        spark_funcs.col("member_id"),
-        spark_funcs.col("elig_status"),
-        spark_funcs.coalesce(spark_funcs.col("hcc_count"), spark_funcs.lit(0)).alias(
-            "hcc_count"
-        ),
-        spark_funcs.coalesce(
-            spark_funcs.col("hcc_count_bin"), spark_funcs.lit("hcc_count_0")
-        ).alias("metric_id"),
+    memmos_calc = (
+        member_months_input.where(spark_funcs.col("cover_medical") == "Y")
+        .groupBy("member_id")
+        .agg(spark_funcs.sum(spark_funcs.col("memmos")).alias("memmos"))
     )
 
-    mem_count_per_bin_per_elig = hcc_mem_results.groupBy(
+    hcc_mem_results = (
+        elig_memmos.join(hcc_count_results, on="member_id", how="left")
+        .join(memmos_calc, on="member_id", how="left")
+        .select(
+            spark_funcs.col("member_id"),
+            spark_funcs.col("memmos"),
+            spark_funcs.col("elig_status"),
+            spark_funcs.coalesce(
+                spark_funcs.col("hcc_count"), spark_funcs.lit(0)
+            ).alias("hcc_count"),
+            spark_funcs.coalesce(
+                spark_funcs.col("hcc_count_bin"), spark_funcs.lit("hcc_count_0")
+            ).alias("metric_id"),
+        )
+    )
+
+    #    mem_count_per_bin_per_elig = hcc_mem_results.groupBy(
+    #        spark_funcs.col("elig_status"), spark_funcs.col("metric_id")
+    #    ).agg(spark_funcs.count((spark_funcs.col("member_id"))).alias("metric_value"))
+
+    memmos_per_bin_per_elig = hcc_mem_results.groupBy(
         spark_funcs.col("elig_status"), spark_funcs.col("metric_id")
-    ).agg(spark_funcs.count((spark_funcs.col("member_id"))).alias("metric_value"))
+    ).agg(spark_funcs.sum((spark_funcs.col("memmos"))).alias("metric_value"))
 
-    hcc_count_avg_per_elig = hcc_mem_results.groupBy(
-        spark_funcs.col("elig_status"),
-        spark_funcs.lit("avg_hcc_count").alias("metric_id"),
-    ).agg(spark_funcs.mean(spark_funcs.col("hcc_count")).alias("metric_value"))
+    hcc_count_weighted_avg_per_elig = (
+        hcc_mem_results.withColumn(
+            "hcc_count_x_memmos",
+            spark_funcs.col("hcc_count") * spark_funcs.col("memmos"),
+        )
+        .groupBy(
+            spark_funcs.col("elig_status"),
+            spark_funcs.lit("weighted_avg_hcc_count").alias("metric_id"),
+        )
+        .agg(
+            spark_funcs.sum(spark_funcs.col("memmos")).alias("sum_memmos"),
+            spark_funcs.sum(spark_funcs.col("hcc_count_x_memmos")).alias(
+                "sum_hcc_count_x_memmos"
+            ),
+        )
+        .withColumn(
+            "metric_value",
+            spark_funcs.col("sum_hcc_count_x_memmos") / spark_funcs.col("sum_memmos"),
+        )
+        .drop("sum_hcc_count_x_memmos", "sum_memmos")
+    )
 
-    mem_count_per_hcc = (
+    #    mem_count_per_hcc = (
+    #        hcc_results["feature_info"]
+    #        .where(spark_funcs.col("feature_name").isin(HCC_COLS))
+    #        .join(elig_memmos, on="member_id", how="inner")
+    #        .groupBy(
+    #            spark_funcs.col("elig_status"),
+    #            spark_funcs.concat(
+    #                spark_funcs.col("feature_name"), spark_funcs.lit("_member_count")
+    #            ).alias("metric_id"),
+    #        )
+    #        .agg(spark_funcs.count(spark_funcs.col("member_id")).alias("metric_value"))
+    #    )
+
+    memmos_per_hcc = (
         hcc_results["feature_info"]
         .where(spark_funcs.col("feature_name").isin(HCC_COLS))
         .join(elig_memmos, on="member_id", how="inner")
+        .join(memmos_calc, on="member_id", how="inner")
         .groupBy(
             spark_funcs.col("elig_status"),
             spark_funcs.concat(
-                spark_funcs.col("feature_name"), spark_funcs.lit("_member_count")
+                spark_funcs.col("feature_name"), spark_funcs.lit("_memmos_count")
             ).alias("metric_id"),
         )
-        .agg(spark_funcs.count(spark_funcs.col("member_id")).alias("metric_value"))
+        .agg(spark_funcs.sum(spark_funcs.col("memmos")).alias("metric_value"))
     )
 
-    risk_scores_metric_out = mem_count_per_bin_per_elig.union(
-        hcc_count_avg_per_elig
-    ).union(mem_count_per_hcc)
+    risk_scores_metric_out = memmos_per_bin_per_elig.union(
+        hcc_count_weighted_avg_per_elig
+    ).union(memmos_per_hcc)
 
     sparkapp.save_df(
         risk_scores_metric_out, PATH_OUTPUTS / "risk_scores_metrics.parquet"
