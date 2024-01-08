@@ -1,6 +1,9 @@
 ## Release Notes
 
 A non-exhaustive list of what has changed in a more readable form than a commit history.
+### V1.12.3
+  - Add 3 months as the default runout.
+  
 ### V1.12.2
   - Updated truncation thresholds to 2022 Settlement AEXPU's Expenditure Truncation Thresholds/Factors (Including Covid episodes).
   - Changed the runout to a variable so the variable could be set in client_env.bat.

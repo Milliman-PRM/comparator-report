@@ -20,8 +20,8 @@ META_SHARED = comparator_report.meta.project.gather_metadata()
 NAME_MODULE = 'outputs'
 PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
 PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
-RUNOUT=os.environ.get('runout')
 NONESRD = ['Aged Non-Dual', 'Aged Dual', 'Disabled']
+RUNOUT = os.environ.get('runout', 3)
 # =============================================================================
 # LIBRARIES, LOCATIONS, LITERALS, ETC. GO ABOVE HERE
 # =============================================================================
