@@ -128,13 +128,8 @@ def _create_time_periods(
 ) -> cms_hcc.pyspark_api.TimePeriods:
     """Create time periods input parameter for CMS-HCC processing"""
 
-    time_period_date = meta_shared["date_latestpaid"] + relativedelta(
-        months=-int(RUNOUT)
-    )
-    time_period_str = time_period_date.strftime("%Y%m")
-
     modeling_windows = sparkapp.load_df(PATH_INPUTS / "time_periods.parquet").where(
-        spark_funcs.col("time_period_id").isin(time_period_str)
+        spark_funcs.col("months_of_claims_runout") == RUNOUT
     )
 
     iter_time_windows = modeling_windows.collect()
@@ -237,10 +232,6 @@ def main() -> int:
         )
     )
 
-    #    mem_count_per_bin_per_elig = hcc_mem_results.groupBy(
-    #        spark_funcs.col("elig_status"), spark_funcs.col("metric_id")
-    #    ).agg(spark_funcs.count((spark_funcs.col("member_id"))).alias("metric_value"))
-
     memmos_per_bin_per_elig = hcc_mem_results.groupBy(
         spark_funcs.col("elig_status"), spark_funcs.col("metric_id")
     ).agg(spark_funcs.sum((spark_funcs.col("memmos"))).alias("metric_value"))
@@ -255,30 +246,12 @@ def main() -> int:
             spark_funcs.lit("weighted_avg_hcc_count").alias("metric_id"),
         )
         .agg(
-            spark_funcs.sum(spark_funcs.col("memmos")).alias("sum_memmos"),
-            spark_funcs.sum(spark_funcs.col("hcc_count_x_memmos")).alias(
-                "sum_hcc_count_x_memmos"
-            ),
+            (
+                spark_funcs.sum(spark_funcs.col("hcc_count_x_memmos"))
+                / spark_funcs.sum(spark_funcs.col("memmos"))
+            ).alias("metric_value")
         )
-        .withColumn(
-            "metric_value",
-            spark_funcs.col("sum_hcc_count_x_memmos") / spark_funcs.col("sum_memmos"),
-        )
-        .drop("sum_hcc_count_x_memmos", "sum_memmos")
     )
-
-    #    mem_count_per_hcc = (
-    #        hcc_results["feature_info"]
-    #        .where(spark_funcs.col("feature_name").isin(HCC_COLS))
-    #        .join(elig_memmos, on="member_id", how="inner")
-    #        .groupBy(
-    #            spark_funcs.col("elig_status"),
-    #            spark_funcs.concat(
-    #                spark_funcs.col("feature_name"), spark_funcs.lit("_member_count")
-    #            ).alias("metric_id"),
-    #        )
-    #        .agg(spark_funcs.count(spark_funcs.col("member_id")).alias("metric_value"))
-    #    )
 
     memmos_per_hcc = (
         hcc_results["feature_info"]
@@ -288,7 +261,7 @@ def main() -> int:
         .groupBy(
             spark_funcs.col("elig_status"),
             spark_funcs.concat(
-                spark_funcs.col("feature_name"), spark_funcs.lit("_memmos_count")
+                spark_funcs.col("feature_name"), spark_funcs.lit("_memmos_sum")
             ).alias("metric_id"),
         )
         .agg(spark_funcs.sum(spark_funcs.col("memmos")).alias("metric_value"))
