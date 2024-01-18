@@ -49,6 +49,8 @@ def main() -> int:
         spark_funcs.col('reporting_date_start').alias('min_incurred_date'),
         spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
     ).collect()[0]
+	
+	os.environ.get('Currently_Assigned_Enabled', 'False').lower() == 'true' 
 
     if os.environ.get('YTD_Only', 'False').lower() == 'true':
         min_incurred_date = date(
