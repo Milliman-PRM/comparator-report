@@ -23,6 +23,7 @@ PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
 PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
 
 RUNOUT = 3
+os.environ.get('Currently_Assigned_Enabled', 'False').lower() == 'true' 
 
 # =============================================================================
 # LIBRARIES, LOCATIONS, LITERALS, ETC. GO ABOVE HERE
@@ -49,8 +50,6 @@ def main() -> int:
         spark_funcs.col('reporting_date_start').alias('min_incurred_date'),
         spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
     ).collect()[0]
-	
-	os.environ.get('Currently_Assigned_Enabled', 'False').lower() == 'true' 
 
     if os.environ.get('YTD_Only', 'False').lower() == 'true':
         min_incurred_date = date(
