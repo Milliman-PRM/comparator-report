@@ -50,6 +50,11 @@ def main() -> int:
         spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
     ).collect()[0]
 
+    current_assigned = dfs_input['members'].filter(
+        spark_funcs.col('assignment_indicator') == 'Y'
+    ).select(
+        'member_id',"prv_hier_2_align"
+    ) 
     if os.environ.get('YTD_Only', 'False').lower() == 'true':
         min_incurred_date = date(
             max_incurred_date.year,
@@ -69,12 +74,10 @@ def main() -> int:
                         )) & (spark_funcs.col('assignment_indicator') == 'Y')
 
     member_months = dfs_input['member_time_windows'].filter(
-        memmos_filter
-    ).join(
-        dfs_input['providers'],
-        on=dfs_input['member_time_windows'].mem_prv_id_align == dfs_input['providers'].prv_id,   
-        how='left'
-    ).withColumn("prv_hier_2",spark_funcs.coalesce(spark_funcs.col("prv_hier_2"),spark_funcs.lit("Unknown"))
+    memmos_filter
+    )  
+    member_months = member_months.join(current_assigned,on="member_id", how="left"
+    ).withColumn("prv_hier_2",spark_funcs.col("prv_hier_2_align")
     ).groupBy(
         'member_id',
         'elig_month',
@@ -94,10 +97,9 @@ def main() -> int:
     recent_info = dfs_input['member_time_windows'].filter(
         memmos_filter
     ).join(
-        dfs_input['providers'],
-        on=dfs_input['member_time_windows'].mem_prv_id_align == dfs_input['providers'].prv_id,   
-        how='left'
-    ).withColumn("prv_hier_2",spark_funcs.coalesce(spark_funcs.col("prv_hier_2"),spark_funcs.lit("Unknown"))
+        current_assigned,
+        on="member_id", how="left"
+    ).withColumn("prv_hier_2",spark_funcs.col("prv_hier_2_align")
     ).select(
         '*',
         spark_funcs.row_number().over(recent_info_window).alias('order'),
@@ -111,12 +113,7 @@ def main() -> int:
         how='inner'
     )
 
-    if os.environ.get('Currently_Assigned_Enabled', 'False').lower() == 'true':
-        current_assigned = dfs_input['members'].filter(
-            spark_funcs.col('assignment_indicator') == 'Y'
-        ).select(
-            'member_id',
-        )        
+    if os.environ.get('Currently_Assigned_Enabled', 'False').lower() == 'true':      
         
         member_join = member_months.join(
             recent_info,
