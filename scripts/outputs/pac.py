@@ -187,18 +187,119 @@ def calc_pac_metrics(
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
     )
+    
+    pac_followup_visits_within_7_days_numer_med = (
+        outclaims_pac.select(
+            "elig_status",
+            "prv_hier_2",
+            spark_funcs.lit("cnt_followup_visits_within_7_days_numer_med").alias(
+                "metric_id"
+            ),
+            spark_funcs.when(
+                (
+                    (spark_funcs.col("followup_visit_within_7_days_numer_yn") == "Y")
+                    & (spark_funcs.col("prm_line") == "I11a")
+                ),
+                spark_funcs.lit(1),
+            )
+            .otherwise(spark_funcs.lit(0))
+            .alias("cnt_followup_visits_within_7_days_numer_yn"),
+        )
+        .groupBy("elig_status", "prv_hier_2", "metric_id")
+        .agg(
+            spark_funcs.sum("cnt_followup_visits_within_7_days_numer_yn").alias(
+                "metric_value"
+            )
+        )
+    )    
 
-    pac_metrics = pac_count.union(
-        pac_died
-    ).union(
-        pac_ipreadmit
-    ).union(
-        pac_snf
-    ).union(
-        pac_rehab
-    ).union(
-        pac_hh
-    ).coalesce(10)
+    pac_followup_visits_within_7_days_denom_med = (
+        outclaims_pac.select(
+            "elig_status",
+            "prv_hier_2",
+            spark_funcs.lit("cnt_followup_visits_within_7_days_denom_med").alias(
+                "metric_id"
+            ),
+            spark_funcs.when(
+                (
+                    (spark_funcs.col("followup_visit_within_7_days_denom_yn") == "Y")
+                    & (spark_funcs.col("prm_line") == "I11a")
+                ),
+                spark_funcs.lit(1),
+            )
+            .otherwise(spark_funcs.lit(0))
+            .alias("cnt_followup_visits_within_7_days_denom_yn"),
+        )
+        .groupBy("elig_status", "prv_hier_2", "metric_id")
+        .agg(
+            spark_funcs.sum("cnt_followup_visits_within_7_days_denom_yn").alias(
+                "metric_value"
+            )
+        )
+    )
+
+    pac_followup_visits_within_7_days_numer_sur = (
+        outclaims_pac.select(
+            "elig_status",
+            "prv_hier_2",
+            spark_funcs.lit("cnt_followup_visits_within_7_days_numer_sur").alias(
+                "metric_id"
+            ),
+            spark_funcs.when(
+                (
+                    (spark_funcs.col("followup_visit_within_7_days_numer_yn") == "Y")
+                    & (spark_funcs.col("prm_line") == "I12")
+                ),
+                spark_funcs.lit(1),
+            )
+            .otherwise(spark_funcs.lit(0))
+            .alias("cnt_followup_visits_within_7_days_numer_yn"),
+        )
+        .groupBy("elig_status", "prv_hier_2", "metric_id")
+        .agg(
+            spark_funcs.sum("cnt_followup_visits_within_7_days_numer_yn").alias(
+                "metric_value"
+            )
+        )
+    )
+
+    pac_followup_visits_within_7_days_denom_sur = (
+        outclaims_pac.select(
+            "elig_status",
+            "prv_hier_2",
+            spark_funcs.lit("cnt_followup_visits_within_7_days_denom_sur").alias(
+                "metric_id"
+            ),
+            spark_funcs.when(
+                (
+                    (spark_funcs.col("followup_visit_within_7_days_denom_yn") == "Y")
+                    & (spark_funcs.col("prm_line") == "I12")
+                ),
+                spark_funcs.lit(1),
+            )
+            .otherwise(spark_funcs.lit(0))
+            .alias("cnt_followup_visits_within_7_days_denom_yn"),
+        )
+        .groupBy("elig_status", "prv_hier_2", "metric_id")
+        .agg(
+            spark_funcs.sum("cnt_followup_visits_within_7_days_denom_yn").alias(
+                "metric_value"
+            )
+        )
+    )
+
+    pac_metrics = (
+        pac_count.union(pac_died)
+        .union(pac_ipreadmit)
+        .union(pac_snf)
+        .union(pac_rehab)
+        .union(pac_hh)
+        .union(pac_followup_visits_within_7_days_numer_med)
+        .union(pac_followup_visits_within_7_days_denom_med)
+        .union(pac_followup_visits_within_7_days_numer_sur)
+        .union(pac_followup_visits_within_7_days_denom_sur)
+        .coalesce(10)
+    )
 
     return pac_metrics
 

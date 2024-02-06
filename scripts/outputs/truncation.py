@@ -85,20 +85,20 @@ def truncation_summary(
         'ucc_sum',
         *[
             spark_funcs.when(
-                spark_funcs.col('paiddate') <= dt_dict['qexpu_runout_7'],
-                spark_funcs.col(ime_dsh_ucc),
-            ).otherwise(
-                spark_funcs.lit(0)
-            ).alias('{col}_7'.format(col=ime_dsh_ucc))
-            for ime_dsh_ucc in ['ime_sum', 'dsh_sum', 'ucc_sum']
-        ],
-        *[
-            spark_funcs.when(
                 spark_funcs.col('paiddate') <= dt_dict['qexpu_runout_14'],
                 spark_funcs.col(ime_dsh_ucc),
             ).otherwise(
                 spark_funcs.lit(0)
             ).alias('{col}_14'.format(col=ime_dsh_ucc))
+            for ime_dsh_ucc in ['ime_sum', 'dsh_sum', 'ucc_sum']
+        ],
+        *[
+            spark_funcs.when(
+                spark_funcs.col('paiddate') <= dt_dict['qexpu_runout_21'],
+                spark_funcs.col(ime_dsh_ucc),
+            ).otherwise(
+                spark_funcs.lit(0)
+            ).alias('{col}_21'.format(col=ime_dsh_ucc))
             for ime_dsh_ucc in ['ime_sum', 'dsh_sum', 'ucc_sum']
         ]        
     ).distinct()
@@ -122,20 +122,20 @@ def truncation_summary(
         spark_funcs.sum('prm_costs').alias('costs'),
         spark_funcs.sum(
             spark_funcs.when(
-                spark_funcs.col('paiddate') <= dt_dict['qexpu_runout_7'],
-                spark_funcs.col('prm_costs')
-            ).otherwise(
-                spark_funcs.lit(0)
-            )
-        ).alias('costs_7'),
-        spark_funcs.sum(
-            spark_funcs.when(
                 spark_funcs.col('paiddate') <= dt_dict['qexpu_runout_14'],
                 spark_funcs.col('prm_costs')
             ).otherwise(
                 spark_funcs.lit(0)
             )
         ).alias('costs_14'),
+        spark_funcs.sum(
+            spark_funcs.when(
+                spark_funcs.col('paiddate') <= dt_dict['qexpu_runout_21'],
+                spark_funcs.col('prm_costs')
+            ).otherwise(
+                spark_funcs.lit(0)
+            )
+        ).alias('costs_21'),
     )
     
     memmos_summary = member_months.groupBy(
@@ -161,22 +161,22 @@ def truncation_summary(
         'truncation_threshold',
         spark_funcs.when(
             spark_funcs.col('elig_status') == 'Aged Non-Dual',
-            134371 * spark_funcs.col('memmos') / 12,
+            147189  * spark_funcs.col('memmos') / 12,
         ).when(
             spark_funcs.col('elig_status') == 'Aged Dual',
-            200883 * spark_funcs.col('memmos') / 12,
+            236991  * spark_funcs.col('memmos') / 12,
         ).when(
             spark_funcs.col('elig_status') == 'Disabled',
-            149255 * spark_funcs.col('memmos') / 12,
+            177548 * spark_funcs.col('memmos') / 12,
         ).when(
             spark_funcs.col('elig_status') == 'ESRD',
-            434249 * spark_funcs.col('memmos') / 12,
+            507077  * spark_funcs.col('memmos') / 12,
         ).otherwise(
             99999999999
         )
     )
 
-    for suffix in ['costs', 'costs_7', 'costs_14']:
+    for suffix in ['costs', 'costs_14', 'costs_21']:
         mem_all_costs = mem_all_costs.withColumn(
             '{col}_reduced'.format(col=suffix),
             spark_funcs.col(suffix)
@@ -224,8 +224,8 @@ def main() -> int:
         spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
     ).collect()[0]
 
-    qexpu_runout_7 = max_incurred_date + timedelta(days=7)
     qexpu_runout_14 = max_incurred_date + timedelta(days=14)
+    qexpu_runout_21 = max_incurred_date + timedelta(days=21)
 
     member_months = dfs_input['member_months'].where(
         spark_funcs.col('cover_medical') == 'Y'
@@ -234,8 +234,8 @@ def main() -> int:
     dt_dict = {
         'min_incurred_date' : min_incurred_date,
         'max_incurred_date' : max_incurred_date,
-        'qexpu_runout_7' : qexpu_runout_7,
         'qexpu_runout_14' : qexpu_runout_14,
+        'qexpu_runout_21' : qexpu_runout_21,
     }
 
     trunc_fromdt = truncation_summary(
