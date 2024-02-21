@@ -74,6 +74,8 @@ def main() -> int:
     ).agg(
         spark_funcs.sum('memmos_medical').alias('memmos')
     )
+	
+	member_months = member_months.withColumn("year", spark_funcs.year("elig_month"))
 
     recent_info_window = Window().partitionBy(
         'member_id',
@@ -91,11 +93,11 @@ def main() -> int:
         'order = 1'
     )
 
-    risk_scores = dfs_input['risk_scores'].join(
-        dfs_input['time_periods'].where(spark_funcs.col('months_of_claims_runout') == RUNOUT),
-        on='time_period_id',
-        how='inner'
-    )
+    risk_scores = dfs_input["risk_scores"].where(
+            spark_funcs.col("time_period_id") % 100 == 12
+            ).withColumn("year",
+            ((spark_funcs.col("time_period_id") - 12) / 100).cast("integer")
+			)
 
     if os.environ.get('Currently_Assigned_Enabled', 'False').lower() == 'true':
         current_assigned = dfs_input['members'].filter(
@@ -110,7 +112,7 @@ def main() -> int:
             how='inner'
         ).join(
             risk_scores,
-            on='member_id',
+            on=['member_id', 'year'],
             how='left_outer'
         ).join(
             current_assigned,
@@ -144,7 +146,7 @@ def main() -> int:
             how='inner'
         ).join(
             risk_scores,
-            on='member_id',
+            on=['member_id', 'year'],
             how='left_outer'
         ).join(
             current_assigned,
@@ -172,7 +174,7 @@ def main() -> int:
             how='inner'
         ).join(
             risk_scores,
-            on='member_id',
+            on=['member_id', 'year'],
             how='left_outer'
         ).select(
             'member_id',
@@ -190,7 +192,8 @@ def main() -> int:
             spark_funcs.col('elig_status') != 'Unknown'
         )
 
-
+	member_join = member_join.drop('year')
+	
     sparkapp.save_df(
         member_join,
         PATH_OUTPUTS / 'member_months.parquet',
