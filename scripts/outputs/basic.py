@@ -291,9 +291,8 @@ def main() -> int:
         .where(spark_funcs.col("row_rank") == 1)
     )
 
-    max_date = recent_wellness_visit.select(spark_funcs.max("elig_month")).collect()[0][
-        0
-    ]
+    max_date = recent_wellness_visit.select(spark_funcs.max("elig_month")).collect()[0][0]
+    
     recent_wellness_visit = recent_wellness_visit.where(
         spark_funcs.col("elig_month") == max_date
     )
@@ -301,6 +300,7 @@ def main() -> int:
     cnt_wellness_visits_numer = (
         recent_wellness_visit.select(
             "elig_status",
+            "prv_hier_2",
             spark_funcs.lit("cnt_wellness_visits_numer").alias("metric_id"),
             recent_wellness_visit.member_id,
             "tag",
@@ -313,6 +313,7 @@ def main() -> int:
         member_months.where(spark_funcs.col("elig_month") == max_date)
         .select(
             "elig_status",
+            "prv_hier_2",
             spark_funcs.lit("cnt_wellness_visits_denom").alias("metric_id"),
             "member_id",
         )
