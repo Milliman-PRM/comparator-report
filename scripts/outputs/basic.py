@@ -305,7 +305,7 @@ def main() -> int:
             recent_wellness_visit.member_id,
             "tag",
         )
-        .groupBy("elig_status", "metric_id", "prv_hier_2")
+        .groupBy("elig_status", "prv_hier_2", "metric_id")
         .agg(spark_funcs.sum("tag").alias("metric_value"))
     )
 
@@ -317,7 +317,7 @@ def main() -> int:
             spark_funcs.lit("cnt_wellness_visits_denom").alias("metric_id"),
             "member_id",
         )
-        .groupBy("elig_status", "metric_id", "prv_hier_2")
+        .groupBy("elig_status", "prv_hier_2", "metric_id")
         .agg(spark_funcs.countDistinct("member_id").alias("metric_value"))
     )
 
