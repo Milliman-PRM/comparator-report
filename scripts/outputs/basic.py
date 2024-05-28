@@ -331,7 +331,7 @@ def main() -> int:
         .union(cnt_assigned_mems_all)
         .union(cnt_wellness_visits_numer)
         .union(cnt_wellness_visits_denom)
-        .union(coalesce(10))
+        .coalesce(10)
     )
 
     sparkapp.save_df(
