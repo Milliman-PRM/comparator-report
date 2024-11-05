@@ -192,7 +192,9 @@ def main() -> int:
         'pmpmfactor',
     )
 
-    admits = outclaims_mem.select(
+    admits = outclaims_mem.filter(
+        outclaims_mem.snfrm_denom_yn == 'Y'
+    ).select(
         'elig_status',
         'btnumber',
         spark_funcs.lit('SNF').alias('metric_id'),
@@ -319,10 +321,8 @@ def main() -> int:
         'caseadmitid'
     ).distinct()
         
-    snf_readmits = outclaims_mem.join(
-        ip_readmits_w_snf,
-        on='caseadmitid',
-        how='inner',
+    snf_readmits = outclaims_mem.filter(
+        outclaims_mem.snfrm_numer_yn == 'Y'
     ).select(
         'elig_status',
         spark_funcs.lit('SNF_Readmits').alias('metric_id'),
