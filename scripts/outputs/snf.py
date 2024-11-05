@@ -192,9 +192,7 @@ def main() -> int:
         'pmpmfactor',
     )
 
-    admits = outclaims_mem.filter(
-        outclaims_mem.snfrm_denom_yn == 'Y'
-    ).select(
+    admits = outclaims_mem.select(
         'elig_status',
         'btnumber',
         spark_funcs.lit('SNF').alias('metric_id'),
@@ -333,6 +331,21 @@ def main() -> int:
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
     )
+    
+    snf_readmits_denom = admits = outclaims_mem.filter(
+        outclaims_mem.snfrm_denom_yn == 'Y'
+    ).select(
+        'elig_status',
+        'btnumber',
+        spark_funcs.lit('SNF').alias('metric_id'),
+        'prm_admits',
+    ).groupBy(
+        'elig_status',
+        'btnumber',
+        'metric_id',
+    ).agg(
+        spark_funcs.sum('prm_admits').alias('metric_value')
+    )
             
     snf_metrics = admits.select(
         'elig_status',
@@ -352,6 +365,8 @@ def main() -> int:
         distinct_snfs
     ).union(
         snf_readmits
+    ).union(
+        snf_readmits_denom
     ).coalesce(10)
 
     sparkapp.save_df(
