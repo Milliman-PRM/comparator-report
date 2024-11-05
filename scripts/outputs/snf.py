@@ -334,6 +334,13 @@ def main() -> int:
     
     snf_readmits_denom = outclaims_mem.filter(
         outclaims_mem.snfrm_denom_yn == 'Y'
+    ).select(
+        'elig_status',
+        spark_funcs.lit('SNF_Readmits_denom').alias('metric_id'),
+        'prm_admits',
+    ).groupBy(
+        'elig_status',
+        'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
     )
