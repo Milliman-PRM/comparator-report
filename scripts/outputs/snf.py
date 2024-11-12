@@ -329,10 +329,8 @@ def main() -> int:
         'caseadmitid'
     ).distinct()
         
-    snf_readmits = outclaims_mem.join(
-        ip_readmits_w_snf,
-        on='caseadmitid',
-        how='inner',
+    snf_readmits = outclaims_mem.filter(
+        outclaims_mem.snfrm_numer_yn == 'Y'
     ).select(
         'elig_status',
         'prv_hier_2',
@@ -341,6 +339,20 @@ def main() -> int:
     ).groupBy(
         'elig_status',
         'prv_hier_2',
+        'metric_id',
+    ).agg(
+        spark_funcs.sum('prm_admits').alias('metric_value')
+    )
+    
+    snf_readmits_denom = outclaims_mem.filter(
+        outclaims_mem.snfrm_denom_yn == 'Y'
+    ).select(
+        'elig_status',
+        'prv_hier_2',
+        spark_funcs.lit('SNF_Readmits_denom').alias('metric_id'),
+        'prm_admits',
+    ).groupBy(
+        'elig_status',
         'metric_id',
     ).agg(
         spark_funcs.sum('prm_admits').alias('metric_value')
@@ -366,6 +378,8 @@ def main() -> int:
         distinct_snfs
     ).union(
         snf_readmits
+    ).union(
+        snf_readmits_denom
     ).coalesce(10)
 
     sparkapp.save_df(
