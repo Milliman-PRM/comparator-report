@@ -51,9 +51,10 @@ def main() -> int:
     ).collect()[0]
 
     current_assigned = dfs_input['members'].filter(
-        spark_funcs.col('assignment_indicator') == 'Y'
+        (spark_funcs.col('assignment_indicator') == 'Y') &
+        (spark_funcs.col('prv_hier_2_align').isin("JHN", "HFPN"))
     ).select(
-        'member_id',"prv_hier_2_align"
+        'member_id', spark_funcs.lit("JHN_HFPN_combined").alias("prv_hier_2_align")
     ) 
     if os.environ.get('YTD_Only', 'False').lower() == 'true':
         min_incurred_date = date(
