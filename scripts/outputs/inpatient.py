@@ -323,8 +323,7 @@ def calc_readmits(
     ) -> "DataFrame":
     """Calculate potential and actual readmits"""
     outclaims_readmits = outclaims.where(
-        F.col('prm_line').startswith("I1")
-        & (F.col('prm_line') != "I11b")
+        F.col('prm_line') != 'I31'
     )
 
     potential = outclaims_readmits.select(
