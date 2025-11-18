@@ -5,66 +5,61 @@
 ### DEVELOPER NOTES:
   None
 """
+
+
 # pylint: disable=no-member
-import logging
+#import logging
+from databricks.sdk.runtime import *
 import os
 
 from datetime import date
-from prm.spark.app import SparkApp
-import pyspark.sql.functions as spark_funcs
+import pyspark.sql.functions as F
 from pyspark.sql import Window
-import comparator_report.meta.project
 
-LOGGER = logging.getLogger(__name__)
-META_SHARED = comparator_report.meta.project.gather_metadata()
+INPUT = 'premier_data_feed'
+OUTPUT = 'premier_data_feed'
+RUNOUT = 3
 
-NAME_MODULE = 'outputs'
-PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
-PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
-
-RUNOUT = os.environ.get('runout', 3)
 # =============================================================================
 # LIBRARIES, LOCATIONS, LITERALS, ETC. GO ABOVE HERE
 # =============================================================================
 
-def main() -> int:
+def Members(YTD_Only,Currently_Assigned_Enabled) -> int:
     """Create a member month table for assigned members"""
-    sparkapp = SparkApp(META_SHARED['pipeline_signature'])
-
     dfs_input = {
-        path.stem: sparkapp.load_df(path)
+        path: spark.table(f"{INPUT}.{path}")
         for path in [
-            PATH_INPUTS / 'member_time_windows.parquet',
-            PATH_INPUTS / 'time_periods.parquet',
-            PATH_INPUTS / 'members.parquet',
-            PATH_INPUTS / 'risk_scores.parquet',
+            'member_time_windows',
+            'time_periods',
+            'members',
+            'risk_scores',
         ]
     }
 
     min_incurred_date, max_incurred_date = dfs_input['time_periods'].where(
-        spark_funcs.col('months_of_claims_runout') == RUNOUT
+        F.col('months_of_claims_runout') == RUNOUT
     ).select(
-        spark_funcs.col('reporting_date_start').alias('min_incurred_date'),
-        spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
+        F.add_months(F.to_date(F.concat('time_period_id',F.lit('01')),'yyyyMMdd'),-11).alias('min_incurred_date'),
+        F.last_day(F.to_date(F.concat('time_period_id',F.lit('01')),'yyyyMMdd')).alias('max_incurred_date')
     ).collect()[0]
 
-    if os.environ.get('YTD_Only', 'False').lower() == 'true':
+    if YTD_Only:
         min_incurred_date = date(
             max_incurred_date.year,
             1,
             1
         )
 
-    if os.environ.get('Currently_Assigned_Enabled', 'False').lower() == 'true' or os.environ.get('7_1ACOFlag_Enabled', 'False').lower() == 'true':
-        memmos_filter = spark_funcs.col('elig_month').between(
+    if Currently_Assigned_Enabled:
+        memmos_filter = F.col('elig_month').between(
                             min_incurred_date,
                             max_incurred_date,
                         )
     else:
-        memmos_filter = (spark_funcs.col('elig_month').between(
+        memmos_filter = (F.col('elig_month').between(
                             min_incurred_date,
                             max_incurred_date
-                        )) & (spark_funcs.col('assignment_indicator') == 'Y')
+                        )) & (F.col('assignment_indicator') == 'Y')
 
     member_months = dfs_input['member_time_windows'].filter(
         memmos_filter
@@ -72,34 +67,34 @@ def main() -> int:
         'member_id',
         'elig_month',
     ).agg(
-        spark_funcs.sum('memmos_medical').alias('memmos')
+        F.sum('memmos_medical').alias('memmos')
     )
 
     recent_info_window = Window().partitionBy(
         'member_id',
         'elig_month',
     ).orderBy(
-        spark_funcs.desc('date_end'),
+        F.desc('date_end'),
     )
 
     recent_info = dfs_input['member_time_windows'].filter(
         memmos_filter
     ).select(
         '*',
-        spark_funcs.row_number().over(recent_info_window).alias('order'),
+        F.row_number().over(recent_info_window).alias('order'),
     ).filter(
         'order = 1'
     )
 
     risk_scores = dfs_input['risk_scores'].join(
-        dfs_input['time_periods'].where(spark_funcs.col('months_of_claims_runout') == RUNOUT),
+        dfs_input['time_periods'].where(F.col('months_of_claims_runout') == RUNOUT),
         on='time_period_id',
         how='inner'
     )
 
-    if os.environ.get('Currently_Assigned_Enabled', 'False').lower() == 'true':
+    if Currently_Assigned_Enabled:
         current_assigned = dfs_input['members'].filter(
-            spark_funcs.col('assignment_indicator') == 'Y'
+            F.col('assignment_indicator') == 'Y'
         ).select(
             'member_id',
         )        
@@ -119,25 +114,18 @@ def main() -> int:
         ).select(
             'member_id',
             'elig_month',
-            spark_funcs.col('elig_status_1').alias('elig_status'),
+            F.col('elig_status_1').alias('elig_status'),
             member_months.memmos,
             'risk_score',
-            spark_funcs.when(
+            F.when(
                 member_months.memmos > 0,
-                spark_funcs.lit('Y'),
+                F.lit('Y'),
             ).otherwise(
-                spark_funcs.lit('N')
+                F.lit('N')
             ).alias('cover_medical'),
         ).where(
-            spark_funcs.col('elig_status') != 'Unknown'
+            F.col('elig_status') != 'Unknown'
         )
-    elif os.environ.get('7_1ACOFlag_Enabled', 'False').lower() == 'true':
-        current_assigned = dfs_input['members'].filter(
-            spark_funcs.col('mem_report_hier_2') == 'Y'
-        ).select(
-            'member_id',
-        )        
-        
         member_join = member_months.join(
             recent_info,
             on=['member_id', 'elig_month'],
@@ -153,17 +141,17 @@ def main() -> int:
         ).select(
             'member_id',
             'elig_month',
-            spark_funcs.col('elig_status_1').alias('elig_status'),
+            F.col('elig_status_1').alias('elig_status'),
             member_months.memmos,
             'risk_score',
-            spark_funcs.when(
+            F.when(
                 member_months.memmos > 0,
-                spark_funcs.lit('Y'),
+                F.lit('Y'),
             ).otherwise(
-                spark_funcs.lit('N')
+                F.lit('N')
             ).alias('cover_medical'),
         ).where(
-            spark_funcs.col('elig_status') != 'Unknown'
+            F.col('elig_status') != 'Unknown'
         )            
     else:
         member_join = member_months.join(
@@ -177,37 +165,29 @@ def main() -> int:
         ).select(
             'member_id',
             'elig_month',
-            spark_funcs.col('elig_status_1').alias('elig_status'),
+            F.col('elig_status_1').alias('elig_status'),
             member_months.memmos,
             'risk_score',
-            spark_funcs.when(
+            F.when(
                 member_months.memmos > 0,
-                spark_funcs.lit('Y'),
+                F.lit('Y'),
             ).otherwise(
-                spark_funcs.lit('N')
+                F.lit('N')
             ).alias('cover_medical'),
         ).where(
-            spark_funcs.col('elig_status') != 'Unknown'
+            F.col('elig_status') != 'Unknown'
         )
 
-
-    sparkapp.save_df(
-        member_join,
-        PATH_OUTPUTS / 'member_months.parquet',
-    )
+    print(f"Time Period: {min_incurred_date} to {max_incurred_date}")
+    print(f"Currently Assigned: {Currently_Assigned_Enabled}, YTD: {YTD_Only}")
+    display(member_join.groupBy('elig_status').agg((F.sum('memmos')/ 12).alias('personyears')))
+    member_join.write.mode("overwrite").saveAsTable(f'{OUTPUT}.member_months')
 
     return 0
 
+    
+
 if __name__ == '__main__':
-    # pylint: disable=wrong-import-position, wrong-import-order, ungrouped-imports
-    import sys
-    import prm.utils.logging_ext
-    import prm.spark.defaults_prm
-
-    prm.utils.logging_ext.setup_logging_stdout_handler()
-    SPARK_DEFAULTS_PRM = prm.spark.defaults_prm.get_spark_defaults(META_SHARED)
-
-    with SparkApp(META_SHARED['pipeline_signature'], **SPARK_DEFAULTS_PRM):
-        RETURN_CODE = main()
-
-    sys.exit(RETURN_CODE)
+    YTD_Only = False
+    Currently_Assigned_Enabled = True
+    RETURN_CODE = Members(YTD_Only,Currently_Assigned_Enabled)

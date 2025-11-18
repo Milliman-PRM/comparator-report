@@ -5,30 +5,28 @@
 ### DEVELOPER NOTES:
   None
 """
-# pylint: disable=no-member
-import logging
-import os
+from databricks.sdk.runtime import *
 
-from prm.spark.app import SparkApp
-import pyspark.sql.functions as spark_funcs
-from prm.dates.utils import date_as_month
-from pathlib import Path
+import pyspark.sql.functions as F
 
-import comparator_report.meta.project
+INPUT = 'premier_data_feed'
+OUTPUT = 'premier_data_feed'
 
-LOGGER = logging.getLogger(__name__)
-META_SHARED = comparator_report.meta.project.gather_metadata()
-
-NAME_MODULE = 'outputs'
-PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
-PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
-PATH_RISKADJ = Path(os.environ['reference_data_pathref'])
-
-RUNOUT = os.environ.get('runout', 3)
+RUNOUT = 3
 
 # =============================================================================
 # LIBRARIES, LOCATIONS, LITERALS, ETC. GO ABOVE HERE
 # =============================================================================
+
+def date_as_month(col):
+    return (
+        F.to_date(
+            F.concat(
+                F.date_format(col, "yyyy-MM"),
+                F.lit("-15")
+            )
+        )
+    )
 
 def mr_line_summary(
         outclaims: "DataFrame",
@@ -36,40 +34,40 @@ def mr_line_summary(
     ) -> "DataFrame":
     """Calculate a summary of costs and utilization by mr_line combination"""
     outclaims_mrline = outclaims.where(
-        spark_funcs.col('prm_line').startswith(prm_line)
+        F.col('prm_line').startswith(prm_line)
     )
 
     mr_line_cost = outclaims_mrline.select(
         'elig_status',
-        spark_funcs.lit(prm_line + '_cost').alias('metric_id'),
+        F.lit(prm_line + '_cost').alias('metric_id'),
         'prm_costs',
     ).groupBy(
         'elig_status',
         'metric_id',
     ).agg(
-        spark_funcs.sum('prm_costs').alias('metric_value')
+        F.sum('prm_costs').alias('metric_value')
     )
 
     mr_line_admits = outclaims_mrline.select(
         'elig_status',
-        spark_funcs.lit(prm_line + '_admits').alias('metric_id'),
+        F.lit(prm_line + '_admits').alias('metric_id'),
         'prm_admits',
     ).groupBy(
         'elig_status',
         'metric_id',
     ).agg(
-        spark_funcs.sum('prm_admits').alias('metric_value')
+        F.sum('prm_admits').alias('metric_value')
     )
 
     mr_line_util = outclaims_mrline.select(
         'elig_status',
-        spark_funcs.lit(prm_line + '_util').alias('metric_id'),
+        F.lit(prm_line + '_util').alias('metric_id'),
         'prm_util',
     ).groupBy(
         'elig_status',
         'metric_id',
     ).agg(
-        spark_funcs.sum('prm_util').alias('metric_value')
+        F.sum('prm_util').alias('metric_value')
     )
 
     mr_metrics = mr_line_cost.union(
@@ -86,44 +84,44 @@ def calc_all_mr_lines(
     """Calculate admits, util, and costs for every individual mr_line"""
     mr_line_costs = outclaims.select(
         'elig_status',
-        spark_funcs.concat(
-            spark_funcs.col('prm_line'),
-            spark_funcs.lit('_cost')
+        F.concat(
+            F.col('prm_line'),
+            F.lit('_cost')
         ).alias('metric_id'),
         'prm_costs',
     ).groupBy(
         'elig_status',
         'metric_id',
     ).agg(
-        spark_funcs.sum('prm_costs').alias('metric_value')
+        F.sum('prm_costs').alias('metric_value')
     )
 
     mr_line_admits = outclaims.select(
         'elig_status',
-        spark_funcs.concat(
-            spark_funcs.col('prm_line'),
-            spark_funcs.lit('_admits')
+        F.concat(
+            F.col('prm_line'),
+            F.lit('_admits')
         ).alias('metric_id'),
         'prm_admits',
     ).groupBy(
         'elig_status',
         'metric_id',
     ).agg(
-        spark_funcs.sum('prm_admits').alias('metric_value')
+        F.sum('prm_admits').alias('metric_value')
     ) 
 
     mr_line_util = outclaims.select(
         'elig_status',
-        spark_funcs.concat(
-            spark_funcs.col('prm_line'),
-            spark_funcs.lit('_util')
+        F.concat(
+            F.col('prm_line'),
+            F.lit('_util')
         ).alias('metric_id'),
         'prm_util',
     ).groupBy(
         'elig_status',
         'metric_id',
     ).agg(
-        spark_funcs.sum('prm_util').alias('metric_value')
+        F.sum('prm_util').alias('metric_value')
     ) 
 
     all_mr_line_metrics = mr_line_costs.union(
@@ -134,56 +132,44 @@ def calc_all_mr_lines(
 
     return all_mr_line_metrics
 
-def main() -> int:
+def MRLineMetrics() -> int:
     """Pass claims by mr_line to mr_line_summary to calculate metrics"""
-    sparkapp = SparkApp(META_SHARED['pipeline_signature'])
-
+    
     dfs_input = {
-        path.stem: sparkapp.load_df(path)
+        path: spark.table(f"{INPUT}.{path}")
         for path in [
-            PATH_OUTPUTS / 'member_months.parquet',
-            PATH_INPUTS / 'member_time_windows.parquet',
-            PATH_INPUTS / 'outclaims.parquet',
+            'member_time_windows',
+            'outclaims_full',
         ]
     }
 
+    dfs_input["member_months"] = spark.table(f"{OUTPUT}.member_months")
+
     member_months = dfs_input['member_months'].where(
-        spark_funcs.col('cover_medical') == 'Y'
+        F.col('cover_medical') == 'Y'
     )
 
     elig_memmos = dfs_input['member_time_windows'].where(
-        spark_funcs.col('cover_medical') == 'Y'
+        F.col('cover_medical') == 'Y'
     ).select(
         'member_id',
         'date_start',
         'date_end',
     )
 
-    outclaims = dfs_input['outclaims'].withColumn(
+    outclaims = dfs_input['outclaims_full'].withColumn(
         'month',
-        spark_funcs.when(
-            spark_funcs.col('prm_line') == 'I31',
-            date_as_month(spark_funcs.col('prm_fromdate_case'))
-        ).otherwise(
-            date_as_month(spark_funcs.col('prm_fromdate'))
-        )
+        date_as_month(F.col('prm_fromdate'))
     )
 
     outclaims_mem = outclaims.join(
         elig_memmos,
         on=[
             outclaims.member_id == elig_memmos.member_id,
-            spark_funcs.when(
-                spark_funcs.col('prm_line') == 'I31',
-                spark_funcs.col('prm_fromdate_case').between(
-                    spark_funcs.col('date_start'),
-                    spark_funcs.col('date_end'),
-                )
-            ).otherwise(
-                spark_funcs.col('prm_fromdate').between(
-                    spark_funcs.col('date_start'),
-                    spark_funcs.col('date_end'),
-                )
+            F.col('prm_fromdate').between(
+                    F.col('date_start'),
+                    F.col('date_end'),
+                
             )
             ],
         how='inner',
@@ -210,23 +196,9 @@ def main() -> int:
         all_mr_line_metrics
     ).coalesce(15)
 
-    sparkapp.save_df(
-        mr_line_metrics_stack,
-        PATH_OUTPUTS / 'mr_line_metrics.parquet',
-    )
-
+    mr_line_metrics_stack.write.mode("overwrite").saveAsTable(f'{OUTPUT}.mr_line_metrics')
     return 0
 
 if __name__ == '__main__':
     # pylint: disable=wrong-import-position, wrong-import-order, ungrouped-imports
-    import sys
-    import prm.utils.logging_ext
-    import prm.spark.defaults_prm
-
-    prm.utils.logging_ext.setup_logging_stdout_handler()
-    SPARK_DEFAULTS_PRM = prm.spark.defaults_prm.get_spark_defaults(META_SHARED)
-
-    with SparkApp(META_SHARED['pipeline_signature'], **SPARK_DEFAULTS_PRM):
-        RETURN_CODE = main()
-
-    sys.exit(RETURN_CODE)
+    MRLineMetrics()

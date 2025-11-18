@@ -6,22 +6,14 @@
   None
 """
 # pylint: disable=no-member
-import logging
-import os
-
+from databricks.sdk.runtime import *
 from datetime import date
-from prm.spark.app import SparkApp
-import pyspark.sql.functions as spark_funcs
-import comparator_report.meta.project
+import pyspark.sql.functions as F
 
-LOGGER = logging.getLogger(__name__)
-META_SHARED = comparator_report.meta.project.gather_metadata()
+INPUT = 'premier_data_feed'
+OUTPUT = 'premier_data_feed'
 
-NAME_MODULE = 'outputs'
-PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
-PATH_RS = META_SHARED['path_data_nyhealth_shared'] / 'risk_scores'
-PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
-RUNOUT = os.environ.get('runout', 3)
+RUNOUT = 3
 
 # =============================================================================
 # LIBRARIES, LOCATIONS, LITERALS, ETC. GO ABOVE HERE
@@ -34,49 +26,48 @@ def calc_metrics(
     ) -> "DataFrame":
     """Calculate EOL metrics by ID Name"""
     metric_val = members.where(
-        spark_funcs.col('death_flag') == 1
+        F.col('death_flag') == 1
     ).select(
         'elig_status',
-        spark_funcs.lit(metric_name).alias('metric_id'),
-        spark_funcs.col(metric_id)
+        F.lit(metric_name).alias('metric_id'),
+        F.col(metric_id)
     ).groupBy(
         'elig_status',
         'metric_id'
     ).agg(
-        spark_funcs.sum(metric_id).alias('metric_value')
+        F.sum(metric_id).alias('metric_value')
     )
 
     return metric_val
 
-def main() -> int:
+def EOL(YTD_Only) -> int:
     """A function to pass arguments to calc_metrics"""
-    sparkapp = SparkApp(META_SHARED['pipeline_signature'])
 
     dfs_input = {
-        path.stem: sparkapp.load_df(path)
+        path: spark.table(f"{OUTPUT}.{path}")
         for path in [
-            PATH_OUTPUTS / 'member_months.parquet',
-            PATH_INPUTS / 'members.parquet',
-            PATH_INPUTS / 'outclaims.parquet',
-            PATH_INPUTS / 'time_periods.parquet',
+            'member_months',
+            'members',
+            'time_periods',
+            'eol'
         ]
     }
 
     min_incurred_date, max_incurred_date = dfs_input['time_periods'].where(
-        spark_funcs.col('months_of_claims_runout') == RUNOUT
+        F.col('months_of_claims_runout') == RUNOUT
     ).select(
-        spark_funcs.col('reporting_date_start').alias('min_incurred_date'),
-        spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
+        F.add_months(F.to_date(F.concat('time_period_id',F.lit('01')),'yyyyMMdd'),-11).alias('min_incurred_date'),
+        F.last_day(F.to_date(F.concat('time_period_id',F.lit('01')),'yyyyMMdd')).alias('max_incurred_date')
     ).collect()[0]
 
-    if os.environ.get('YTD_Only', 'False').lower() == 'true':
+    if YTD_Only:
         min_incurred_date = date(
             max_incurred_date.year,
             1,
             1
         )
 
-    member_months = dfs_input['member_months'].where(spark_funcs.col("memmos")!=0.0)
+    member_months = dfs_input['member_months'].where(F.col("memmos")!=0.0)
 
     mem_elig_distinct = member_months.select(
         'member_id',
@@ -94,139 +85,28 @@ def main() -> int:
     ).select(
         mem_distinct.member_id,
         'death_date',
-        spark_funcs.when(
-            spark_funcs.col('death_date').between(
+        F.when(
+            F.col('death_date').between(
                 min_incurred_date,
                 max_incurred_date,
             ),
-            spark_funcs.lit(1)
+            F.lit(1)
         ).otherwise(
-            spark_funcs.lit(0)
+            F.lit(0)
         ).alias('death_flag'),
-        'endoflife_numer_yn_chemolt14days',
-        'endoflife_denom_yn_chemolt14days',
-    ).withColumn(
-        'cnt_cancer',
-        spark_funcs.when(
-            spark_funcs.col('death_flag') == 1,
-            spark_funcs.when(
-                spark_funcs.col('endoflife_denom_yn_chemolt14days') == 'Y',
-                spark_funcs.lit(1)
-            ).otherwise(
-                spark_funcs.lit(0)
-            )
-        ).otherwise(
-            spark_funcs.lit(0)
-        )
-    ).withColumn(
-        'cnt_chemo',
-        spark_funcs.when(
-            spark_funcs.col('death_flag') == 1,
-            spark_funcs.when(
-                spark_funcs.col('endoflife_numer_yn_chemolt14days') == 'Y',
-                spark_funcs.lit(1)
-            ).otherwise(
-                spark_funcs.lit(0)
-            )
-        ).otherwise(
-            spark_funcs.lit(0)
-        )
     )
-
-    claims_mem = mem_death.join(
-        dfs_input['outclaims'],
-        on='member_id',
-        how='inner',
-    ).withColumn(
-        'lt_30_days',
-        spark_funcs.when(
-            spark_funcs.datediff(spark_funcs.col('death_date'),
-                spark_funcs.col('prm_todate')) <= 30,
-            spark_funcs.lit('Y')
-        ).otherwise(
-            spark_funcs.lit('N')
-        )
-    )
-
-    claims_cost = claims_mem.where(
-        spark_funcs.col('lt_30_days') == 'Y'
-    ).select(
-        'member_id',
-        'prm_costs',
-    ).groupBy(
-        'member_id',
-    ).agg(
-        spark_funcs.sum('prm_costs').alias('total_cost')
-    )
-
-    hosp_days = claims_mem.where(
-        spark_funcs.col('prm_line').isin(["P82d", "P82e"])
-    ).select(
-        'member_id',
-        'prm_util',
-    ).groupBy(
-        'member_id',
-    ).agg(
-        spark_funcs.sum('prm_util').alias('hospice_days')
-    )
-
-    death_in_hosp = dfs_input['outclaims'].where(
-        (spark_funcs.col('dischargestatus') == '20')
-        & (spark_funcs.col('prm_line').like('I%'))
-        & (spark_funcs.col('prm_line') != 'I31')
-    ).select(
-        'member_id',
-        spark_funcs.lit(1).alias('death_in_hosp'),
-    ).distinct()    
 
     mem_decor = mem_death.join(
-        claims_cost,
+        dfs_input['eol'],
         on='member_id',
-        how='left_outer',
-    ).join(
-        hosp_days,
-        on='member_id',
-        how='left_outer',
-    ).join(
-        death_in_hosp,
-        on='member_id',
-        how='left_outer',
-    ).withColumn(
-        'cnt_death_in_hosp',
-        spark_funcs.when(
-            spark_funcs.col('death_in_hosp').isNull(),
-            spark_funcs.lit(0)
-        ).otherwise(
-            spark_funcs.lit(1)
-        )
-    ).fillna({
-        'total_cost': 0.0,
-        'hospice_days': 0,
-    }).withColumn(
-        'hosp_never',
-        spark_funcs.when(
-            spark_funcs.col('hospice_days') == 0,
-            spark_funcs.lit(1)
-        ).otherwise(
-            spark_funcs.lit(0)
-        )
-    ).withColumn(
-        'hosp_lt3',
-        spark_funcs.when(
-            spark_funcs.col('hospice_days').isin([1, 2]),
-            spark_funcs.lit(1)
-        ).otherwise(
-            spark_funcs.lit(0)
-        )
+        how='inner'
     ).select(
         'member_id',
-        'death_flag',
-        'cnt_cancer',
-        'total_cost',
-        'cnt_death_in_hosp',
-        'hosp_never',
-        'hosp_lt3',
-        'cnt_chemo'
+        F.col('endoflife_paid_last_30_days').alias('total_cost'),
+        F.col('endoflife_died_in_hospital').alias('cnt_death_in_hosp'),
+        F.col('endoflife_numer_yn_hospice12months').alias('hosp_12months'),
+        F.col('endoflife_numer_yn_hospicelt3day').alias('hosp_lt3'),
+        'death_flag'
     )
 
     mem_elig_death = mem_decor.join(
@@ -237,86 +117,62 @@ def main() -> int:
         'member_id',
         'elig_status',
         'death_flag',
-        'cnt_cancer',
         'total_cost',
         'cnt_death_in_hosp',
-        'hosp_never',
+        'hosp_12months',
         'hosp_lt3',
-        'cnt_chemo',
     )
 
     non_esrd_eol = mem_elig_death.where(
-        spark_funcs.col('elig_status') != 'ESRD'
+        F.col('elig_status') != 'ESRD'
     ).select(
         'member_id',
-        spark_funcs.lit('Non-ESRD').alias('elig_status'),
+        F.lit('Non-ESRD').alias('elig_status'),
         'death_flag',
-        'cnt_cancer',
         'total_cost',
         'cnt_death_in_hosp',
-        'hosp_never',
+        'hosp_12months',
         'hosp_lt3',
-        'cnt_chemo',
     ).distinct()
 
     mem_decor_stack = mem_elig_death.union(
         non_esrd_eol
     )
 
-    cnt_cancer = calc_metrics(mem_decor_stack, 'cnt_cancer', 'cnt_cancer')
     decedent_count = calc_metrics(mem_decor_stack, 'decedent_count', 'death_flag')
     tot_cost = calc_metrics(mem_decor_stack, 'tot_cost_final_30days', 'total_cost')
     death_hosp = calc_metrics(mem_decor_stack, 'cnt_death_in_hosp', 'cnt_death_in_hosp')
-    hosp_never = calc_metrics(mem_decor_stack, 'cnt_hospice_never', 'hosp_never')
+    hosp_12months = calc_metrics(mem_decor_stack, 'cnt_hospice_12months', 'hosp_12months')
     hosp_lt3 = calc_metrics(mem_decor_stack, 'cnt_hospice_lt3days', 'hosp_lt3')
-    cnt_chemo = calc_metrics(mem_decor_stack, 'cnt_chemo', 'cnt_chemo')
 
     decedent_count_all = mem_elig_death.where(
-        spark_funcs.col('death_flag') == 1
+        F.col('death_flag') == 1
     ).select(
-        spark_funcs.lit('All').alias('elig_status'),
-        spark_funcs.lit('decedent_count').alias('metric_id'),
+        F.lit('All').alias('elig_status'),
+        F.lit('decedent_count').alias('metric_id'),
         'member_id'
     ).groupBy(
         'elig_status',
         'metric_id'
     ).agg(
-        spark_funcs.countDistinct('member_id').alias('metric_value')
+        F.countDistinct('member_id').alias('metric_value')
     )
 
-    eol_metrics = cnt_cancer.union(
-        decedent_count
-    ).union(
+    eol_metrics = decedent_count.union(
         tot_cost
     ).union(
         death_hosp
     ).union(
-        hosp_never
+        hosp_12months
     ).union(
         hosp_lt3
-    ).union(
-        cnt_chemo
     ).union(
         decedent_count_all
     ).coalesce(10)
 
-    sparkapp.save_df(
-        eol_metrics,
-        PATH_OUTPUTS / 'eol_metrics.parquet',
-    )
+    eol_metrics.write.mode("overwrite").saveAsTable(f'{OUTPUT}.eol_metrics')
 
     return 0
 
 if __name__ == '__main__':
-    # pylint: disable=wrong-import-position, wrong-import-order, ungrouped-imports
-    import sys
-    import prm.utils.logging_ext
-    import prm.spark.defaults_prm
-
-    prm.utils.logging_ext.setup_logging_stdout_handler()
-    SPARK_DEFAULTS_PRM = prm.spark.defaults_prm.get_spark_defaults(META_SHARED)
-
-    with SparkApp(META_SHARED['pipeline_signature'], **SPARK_DEFAULTS_PRM):
-        RETURN_CODE = main()
-
-    sys.exit(RETURN_CODE)
+    EOL(False)
