@@ -5,43 +5,66 @@
 ### DEVELOPER NOTES:
   None
 """
-# pylint: disable=no-member
-import logging
-import os
-from prm.spark.app import SparkApp
-import pyspark.sql.functions as spark_funcs
-from prm.spark.io_txt import export_csv
+from databricks.sdk.runtime import *
 
-import comparator_report.meta.project
+from datetime import date
+import pyspark.sql.functions as F
+from pyspark.sql import Window
 
-LOGGER = logging.getLogger(__name__)
-META_SHARED = comparator_report.meta.project.gather_metadata()
-
-NAME_MODULE = 'outputs'
-PATH_OUTPUTS = META_SHARED['path_data_comparator_report'] / NAME_MODULE
-PATH_INPUTS = META_SHARED['path_data_nyhealth_shared'] / NAME_MODULE
+INPUT = 'premier_data_feed'
+OUTPUT = 'premier_data_feed'
+RUNOUT = 3
 NONESRD = ['Aged Non-Dual', 'Aged Dual', 'Disabled']
-RUNOUT = os.environ.get('runout', 3)
+
 # =============================================================================
 # LIBRARIES, LOCATIONS, LITERALS, ETC. GO ABOVE HERE
 # =============================================================================
 
-def main() -> int:
+def export_csv(CATALOG, NAME, table, file_name):
+
+    output_dir = f"/Volumes/{CATALOG}/{OUTPUT}/exports/{file_name}"
+    download_folder = f"/Volumes/{CATALOG}/{OUTPUT}/exports/downloads"
+    download_file = f"/Volumes/{CATALOG}/{OUTPUT}/exports/downloads/{NAME}_{file_name}.txt"
+
+    try:
+        dbutils.fs.mkdirs(download_folder)
+    except:
+        pass
+
+    table.coalesce(1).write.mode("overwrite").option("delimiter", "|").csv(output_dir, header=True)
+    files = dbutils.fs.ls(output_dir)
+    part_file = [f.path for f in files if f.name.startswith("part-") and f.name.endswith(".csv")]
+
+    # Move the part file to the desired location
+    dbutils.fs.mv(part_file[0], download_file)
+
+    return 0
+
+def CreateCSVs(CATALOG, NAME) -> int:
     """Output all calculated metrics to CSVs"""
-    sparkapp = SparkApp(META_SHARED['pipeline_signature'])
 
     dfs_input = {
-        path.stem: sparkapp.load_df(path)
-        for path in PATH_OUTPUTS.glob('*.parquet')
+        path: spark.table(f"{INPUT}.{path}")
+        for path in [
+            'basic_metrics',
+            'inpatient_metrics',
+            'outpatient_metrics',
+            'snf_metrics',
+            'er_metrics',
+            'truncation',
+            'eol_metrics',
+            'pac_metrics',
+            'pac_drg_summary',
+            'mr_line_metrics',
+            'time_periods'
+        ]
     }
 
-    time_periods = sparkapp.load_df(PATH_INPUTS / 'time_periods.parquet')
-
-    min_incurred_date, max_incurred_date = time_periods.where(
-        spark_funcs.col('months_of_claims_runout') == RUNOUT
+    min_incurred_date, max_incurred_date = dfs_input['time_periods'].where(
+        F.col('months_of_claims_runout') == RUNOUT
     ).select(
-        spark_funcs.col('reporting_date_start').alias('min_incurred_date'),
-        spark_funcs.col('reporting_date_end').alias('max_incurred_date'),
+        F.add_months(F.to_date(F.concat('time_period_id',F.lit('01')),'yyyyMMdd'),-11).alias('min_incurred_date'),
+        F.last_day(F.to_date(F.concat('time_period_id',F.lit('01')),'yyyyMMdd')).alias('max_incurred_date')
     ).collect()[0]
 
     time_period = str(min_incurred_date.year) + 'Q' + str((min_incurred_date.month - 1) // 3 + 1) + '_' + str(max_incurred_date.year) + 'Q' + str((max_incurred_date.month - 1) // 3 + 1)
@@ -61,16 +84,16 @@ def main() -> int:
     )
 
     nonesrd_metrics = metrics_stack.where(
-        spark_funcs.col('elig_status').isin(NONESRD)
+        F.col('elig_status').isin(NONESRD)
     ).select(
-        spark_funcs.lit('Non-ESRD').alias('elig_status'),
+        F.lit('Non-ESRD').alias('elig_status'),
         'metric_id',
         'metric_value',
     ).groupBy(
         'elig_status',
         'metric_id',
     ).agg(
-        spark_funcs.sum('metric_value').alias('metric_value')
+        F.sum('metric_value').alias('metric_value')
     )
 
     metrics_out = metrics_stack.union(
@@ -78,24 +101,24 @@ def main() -> int:
     ).union(
         dfs_input['eol_metrics']
     ).select(
-        spark_funcs.lit(META_SHARED['name_client']).alias('name_client'),
-        spark_funcs.lit(time_period).alias('time_period'),
+        F.lit(NAME).alias('name_client'),
+        F.lit(time_period).alias('time_period'),
         'elig_status',
-        spark_funcs.lit('').alias('metric_category'),
+        F.lit('').alias('metric_category'),
         'metric_id',
-        spark_funcs.lit('').alias('metric_name'),
+        F.lit('').alias('metric_name'),
         'metric_value',
     ).withColumn(
         'idx',
-        spark_funcs.regexp_replace(
-            spark_funcs.concat(
-                spark_funcs.col('name_client'),
-                spark_funcs.lit('_'),
-                spark_funcs.col('time_period'),
-                spark_funcs.lit('_'),
-                spark_funcs.col('elig_status'),
-                spark_funcs.lit('_'),
-                spark_funcs.col('metric_id'),
+        F.regexp_replace(
+            F.concat(
+                F.col('name_client'),
+                F.lit('_'),
+                F.col('time_period'),
+                F.lit('_'),
+                F.col('elig_status'),
+                F.lit('_'),
+                F.col('metric_id'),
             ),
             ' ',
             ''
@@ -103,8 +126,8 @@ def main() -> int:
     ).coalesce(10)
 
     pac_drg = dfs_input['pac_drg_summary'].select(
-        spark_funcs.lit(META_SHARED['name_client']).alias('name_client'),
-        spark_funcs.lit(time_period).alias('time_period'),
+        F.lit(NAME).alias('name_client'),
+        F.lit(time_period).alias('time_period'),
         'elig_status',
         'prm_drg',
         'pac_count',
@@ -115,67 +138,60 @@ def main() -> int:
         'pac_death_count',
     )
 
-    betos_summary = dfs_input['betos'].select(
-        spark_funcs.lit(META_SHARED['name_client']).alias('name_client'),
-        spark_funcs.lit(time_period).alias('time_period'),
-        '*',
-    )
+    # betos_summary = dfs_input['betos'].select(
+    #     F.lit(META_SHARED['name_client']).alias('name_client'),
+    #     F.lit(time_period).alias('time_period'),
+    #     '*',
+    # )
 
     truncation_summary = dfs_input['truncation'].select(
-        spark_funcs.lit(META_SHARED['name_client']).alias('name_client'),
-        spark_funcs.lit(time_period).alias('time_period'),
+        F.lit(NAME).alias('name_client'),
+        F.lit(time_period).alias('time_period'),
         '*',
     )
 
-    sparkapp.save_df(
-        metrics_out,
-        PATH_OUTPUTS / 'metrics.parquet',
-    )
+    metrics_out.write.mode("overwrite").saveAsTable(f'{OUTPUT}.metrics')
 
-    export_csv(
-        metrics_out,
-        PATH_OUTPUTS / 'metrics.txt',
-        sep='|',
-        header=True,
-        single_file=True,
-    )
+    export_csv(CATALOG, NAME, metrics_out, 'metrics')
+    export_csv(CATALOG, NAME, truncation_summary, 'truncation_summary')
+    export_csv(CATALOG, NAME, pac_drg, 'pac_drg')
 
-    export_csv(
-        pac_drg,
-        PATH_OUTPUTS / 'pac_drg_summary.txt',
-        sep='|',
-        header=True,
-        single_file=True,
-    )
 
-    export_csv(
-        betos_summary,
-        PATH_OUTPUTS / 'betos_summary.txt',
-        sep='|',
-        header=True,
-        single_file=True,
-    )
+    # metrics_out.coalesce(1).write.mode("overwrite").option("delimiter", "|").csv(f"/Volumes/{CATALOG}/{OUTPUT}/exports/metrics_txt", header=True)
 
-    export_csv(
-        truncation_summary,
-        PATH_OUTPUTS / 'truncation_summary.txt',
-        sep='|',
-        header=True,
-        single_file=True,
-    )       
+    # truncation_summary.coalesce(1).write.mode("overwrite").option("delimiter", "|").csv(f"/Volumes/{CATALOG}/{OUTPUT}/exports/truncation_summary_txt", header=True)
+
+    # pac_drg.coalesce(1).write.mode("overwrite").option("delimiter", "|").csv(f"/Volumes/{CATALOG}/{OUTPUT}/exports/pac_drg_summary_txt", header=True)
+
+
+    # export_csv(
+    #     pac_drg,
+    #     PATH_OUTPUTS / 'pac_drg_summary.txt',
+    #     sep='|',
+    #     header=True,
+    #     single_file=True,
+    # )
+
+    # export_csv(
+    #     betos_summary,
+    #     PATH_OUTPUTS / 'betos_summary.txt',
+    #     sep='|',
+    #     header=True,
+    #     single_file=True,
+    # )
+
+    # export_csv(
+    #     truncation_summary,
+    #     PATH_OUTPUTS / 'truncation_summary.txt',
+    #     sep='|',
+    #     header=True,
+    #     single_file=True,
+    # )       
 
     return 0
 
 if __name__ == '__main__':
-    # pylint: disable=wrong-import-position, wrong-import-order, ungrouped-imports
-    import sys
-    import prm.utils.logging_ext
-    import prm.spark.defaults_prm
 
-    prm.utils.logging_ext.setup_logging_stdout_handler()
-    SPARK_DEFAULTS_PRM = prm.spark.defaults_prm.get_spark_defaults(META_SHARED)
+### Example
+    RETURN_CODE = CreateCSVs("acohfh_processing","Henry Ford Physician Accountable Care Organization")
 
-    with SparkApp(META_SHARED['pipeline_signature'], **SPARK_DEFAULTS_PRM):
-        RETURN_CODE = main()
-
-    sys.exit(RETURN_CODE)
