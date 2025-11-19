@@ -388,12 +388,26 @@ def Inpatient() -> int:
         'date_end',
     )
 
+    rolled_up_days = dfs_input['outclaims_full'].where(
+        F.col('prm_line').like('I%')
+    ).groupBy('caseadmitid').agg(F.sum('prm_util').alias('prm_util_agg'))
+    
     outclaims = dfs_input['outclaims_full'].withColumn(
         'month',
         date_as_month(F.col('prm_fromdate'))
     ).where(
         F.col('prm_line').like('I%')
+    ).drop(
+        'prm_util'
+    ).join(rolled_up_days,
+        on='caseadmitid',
+        how='left_outer'
+    ).withColumn(
+        'prm_util',
+        F.col('prm_util_agg')
     )
+
+
 
     outclaims_mem = outclaims.join(
         elig_memmos,
