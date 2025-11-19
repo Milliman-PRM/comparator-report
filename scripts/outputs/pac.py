@@ -259,7 +259,7 @@ def PAC() -> int:
         'pac_died_in_hospital_yn'
     )
 
-    pac_flags = outclaims.join(pac_case_summary, on="caseadmitid", how="inner")
+    pac_flags = outclaims.join(pac_case_summary, on="caseadmitid", how="left_outer")
 
     pac_elig_drgs = (
         ref_pac_benchmarks
