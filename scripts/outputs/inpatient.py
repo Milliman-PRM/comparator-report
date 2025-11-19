@@ -400,7 +400,7 @@ def Inpatient() -> int:
     ).drop(
         'prm_util'
     ).join(rolled_up_days,
-        on='caseadmitid',
+        on=[(dfs_input['outclaims_full'].caseadmitid == rolled_up_days.caseadmitid) & (dfs_input['outclaims_full'].prm_admits != 0)],
         how='left_outer'
     ).withColumn(
         'prm_util',
